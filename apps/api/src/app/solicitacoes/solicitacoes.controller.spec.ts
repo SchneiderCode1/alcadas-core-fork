@@ -4,6 +4,10 @@ import { ListagemValidator } from './listagem.validator';
 import { SolicitacoesController } from './solicitacoes.controller';
 import { SolicitacoesService } from './solicitacoes.service';
 
+// O guard real carrega o firebase-admin (ESM do `jose`), que o Jest não transforma.
+// Aqui só interessa o que o controller faz com o usuário já autenticado.
+jest.mock('../auth/firebase-auth.guard', () => ({ FirebaseAuthGuard: class {} }));
+
 describe('SolicitacoesController', () => {
   const usuario: UsuarioAutenticado = { uid: 'ana', tenantId: 'startop', papeis: ['SOLICITANTE'] };
   let service: { criarSolicitacao: jest.Mock; listarPorTenant: jest.Mock };
