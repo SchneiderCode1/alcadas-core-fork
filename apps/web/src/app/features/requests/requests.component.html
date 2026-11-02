@@ -222,7 +222,7 @@
                     <span class="material-symbols-rounded empty-icon">inbox</span>
                     <h3 class="empty-title">Nenhuma solicitação ainda</h3>
                     <p class="empty-desc">Quando alguém da sua organização submeter um pedido, ele aparece aqui.</p>
-                    <button type="button" class="btn-header-outline" (click)="openCreateDrawer()">Criar a primeira</button>
+                    <button type="button" class="btn-header-outline" (click)="goToCreatePage()">Criar a primeira</button>
                   </div>
                 </td>
               </tr>
@@ -394,6 +394,7 @@
     </footer>
   </main>
 
+
   <!-- ========================================================================= -->
   <!-- DRAWER LATERAL: DETALHES DA SOLICITAÇÃO (NA DIV DEBAIXO DO HEADER)        -->
   <!-- ========================================================================= -->
@@ -515,6 +516,10 @@
                       <span class="material-symbols-rounded comment-quote-icon">format_quote</span>
                       <p class="comment-text">{{ step.comentario }}</p>
                     </div>
+                  }
+
+                  @if (step.hashSha256) {
+                    <span class="step-timestamp" [title]="step.hashSha256">SHA-256 {{ step.hashSha256 | slice: 0 : 12 }}…</span>
                   }
                 </div>
               </div>

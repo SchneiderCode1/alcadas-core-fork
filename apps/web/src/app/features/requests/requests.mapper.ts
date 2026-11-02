@@ -152,6 +152,7 @@ export function etapasDaTrilha(elos: readonly EloAuditoriaDto[]): ApprovalStep[]
         status: evento.status,
         dataHora: formatarDataHora(elo.timestampUtc),
         comentario: textoDoPayload(elo.payload, 'motivo') ?? textoDoPayload(elo.payload, 'observacao'),
+        hashSha256: elo.hashAtual,
       };
     });
 }

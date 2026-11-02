@@ -63,6 +63,7 @@ describe('requests.mapper', () => {
     expect(etapas.map((e) => e.nome)).toEqual(['Solicitação criada', 'Rejeição']);
     expect(etapas[1]).toMatchObject({ status: 'REJEITADA', papel: 'APROVADOR_N2', responsavelNome: 'carlos', comentario: 'Fora do orçamento' });
     expect(etapas[0].dataHora).toBeTruthy();
+    expect(etapas[0].hashSha256).toBe('a'.repeat(64));
   });
 
   it('usa o catálogo de categorias compartilhado com a API', () => {

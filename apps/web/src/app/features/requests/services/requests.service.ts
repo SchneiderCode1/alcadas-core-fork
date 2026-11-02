@@ -51,6 +51,17 @@ export class RequestsService {
 
   readonly stats = computed<RequestStats>(() => calcularIndicadores(this._requests()));
 
+  getRequestById(id: string): RequestItem | undefined {
+    return this._requests().find((r) => r.id === id);
+  }
+
+  /** Carrega só se ainda não houver dados (telas abertas direto pela URL). */
+  ensureLoaded(): void {
+    if (this._loadState() !== 'pronto') {
+      this.load();
+    }
+  }
+
   /**
    * Carrega solicitações, centros de custo e tetos. Centros e tetos são complementares:
    * se falharem, a lista aparece mesmo assim (com nomes/alçadas genéricos).
@@ -89,10 +100,11 @@ export class RequestsService {
 
   /**
    * T02/T03/T04 — aprovar, rejeitar ou pedir ajuste, sempre com a `versao` lida (CA-05.1).
-   * `motivo` é obrigatório (≥ 10 caracteres) para rejeitar e pedir ajuste (CA-03.2).
+   * `texto` é o motivo (obrigatório, ≥ 10 caracteres) ao rejeitar ou pedir ajuste (CA-03.2)
+   * e a observação opcional ao aprovar.
    */
-  decide(request: RequestItem, acao: DecisionAction, motivo?: string): Observable<RequestItem> {
-    const corpo = acao === 'aprovar' ? { versao: request.versao } : { versao: request.versao, motivo };
+  decide(request: RequestItem, acao: DecisionAction, texto?: string): Observable<RequestItem> {
+    const corpo = corpoDaDecisao(request.versao, acao, texto);
     return this.http
       .post<SolicitacaoResponseDto>(`${this.apiBaseUrl}/solicitacoes/${encodeURIComponent(request.id)}/${acao}`, corpo)
       .pipe(
@@ -101,6 +113,29 @@ export class RequestsService {
           this._requests.update((lista) => lista.map((item) => (item.id === atualizada.id ? atualizada : item))),
         ),
       );
+  }
+
+  /**
+   * Aprovação em lote: cada solicitação vai à API com a própria versão. Uma falha não interrompe
+   * as demais; o resultado informa quantas foram aprovadas e as mensagens de erro.
+   */
+  approveMany(requests: readonly RequestItem[], observacao?: string): Observable<ResultadoEmLote> {
+    if (requests.length === 0) {
+      return of({ aprovadas: 0, erros: [] });
+    }
+    return forkJoin(
+      requests.map((request) =>
+        this.decide(request, 'aprovar', observacao).pipe(
+          map(() => null),
+          catchError((erro: unknown) => of(`${request.codigo}: ${mensagemDeErroDaApi(erro)}`)),
+        ),
+      ),
+    ).pipe(
+      map((resultados) => {
+        const erros = resultados.filter((r): r is string => r !== null);
+        return { aprovadas: resultados.length - erros.length, erros };
+      }),
+    );
   }
 
   /** US-07 — linha do tempo da trilha SHA-256 da solicitação. */
@@ -117,6 +152,19 @@ export class RequestsService {
       usuarioAtualId: this.authService.currentUser()?.id,
     };
   }
+}
+
+export interface ResultadoEmLote {
+  aprovadas: number;
+  erros: string[];
+}
+
+function corpoDaDecisao(versao: number, acao: DecisionAction, texto?: string): Record<string, unknown> {
+  const textoLimpo = texto?.trim();
+  if (acao === 'aprovar') {
+    return textoLimpo ? { versao, observacao: textoLimpo } : { versao };
+  }
+  return { versao, motivo: textoLimpo };
 }
 
 function calcularIndicadores(lista: readonly RequestItem[]): RequestStats {
@@ -137,229 +185,4 @@ function calcularIndicadores(lista: readonly RequestItem[]): RequestStats {
     ajustes: contar('EM_AJUSTE').length,
     rejeitadas,
   };
-  getRequestById(id: string): RequestItem | undefined {
-    return this._requests().find((r) => r.id === id);
-  }
-
-  cancelRequest(id: string): boolean {
-    let updated = false;
-    this._requests.update((list) =>
-      list.map((req) => {
-        if (req.id === id && (req.status === 'PENDENTE' || req.status === 'AJUSTE_SOLICITADO')) {
-          updated = true;
-          return {
-            ...req,
-            status: 'CANCELADA',
-            statusLabel: 'Cancelada',
-            statusIcon: 'do_not_disturb_on',
-            dataAtualizacao: new Date().toISOString(),
-          };
-        }
-        return req;
-      })
-    );
-    return updated;
-  }
-
-  approveRequest(
-    id: string,
-    signatureImg?: string,
-    comentario?: string,
-    signatario = 'Diretoria Executiva / Aprovador'
-  ): boolean {
-    let updated = false;
-    const nowIso = new Date().toISOString();
-    const nowFormatted = new Date().toLocaleString('pt-BR');
-    const randomHash =
-      Array.from({ length: 8 }, () => Math.floor(Math.random() * 16).toString(16)).join('') +
-      '...' +
-      Array.from({ length: 8 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
-
-    this._requests.update((list) =>
-      list.map((req) => {
-        if (req.id !== id) return req;
-        updated = true;
-
-        const currentStepIndex = req.fluxoDestinado.etapas.findIndex(
-          (e) => e.status === 'PENDENTE' || e.status === 'EM_ANALISE' || e.status === 'AJUSTE'
-        );
-
-        const updatedEtapas = req.fluxoDestinado.etapas.map((step, idx) => {
-          if (
-            idx === currentStepIndex ||
-            (currentStepIndex === -1 && idx === req.fluxoDestinado.etapas.length - 1)
-          ) {
-            return {
-              ...step,
-              status: 'CONCLUIDA' as const,
-              dataHora: nowFormatted,
-              responsavelNome: signatario,
-              comentario: comentario || 'Aprovado e assinado digitalmente com conformidade orçamentária.',
-              assinatura: {
-                signatario,
-                cargo: 'Aprovador de Alçada Titular',
-                dataHora: nowFormatted,
-                hashSha256: randomHash,
-                assinaturaImg: signatureImg,
-              },
-            };
-          }
-          return step;
-        });
-
-        const isLastStep =
-          currentStepIndex === -1 || currentStepIndex >= req.fluxoDestinado.etapas.length - 1;
-
-        const nextStep = isLastStep ? null : req.fluxoDestinado.etapas[currentStepIndex + 1];
-
-        return {
-          ...req,
-          status: isLastStep ? ('APROVADA' as const) : ('PENDENTE' as const),
-          statusLabel: isLastStep ? 'Aprovada' : 'Em Análise',
-          statusIcon: isLastStep ? 'verified' : 'hourglass_top',
-          dataAtualizacao: nowIso,
-          fluxoDestinado: {
-            ...req.fluxoDestinado,
-            etapaAtualNumero: isLastStep
-              ? req.fluxoDestinado.totalEtapas
-              : currentStepIndex + 2,
-            etapaAtualNome: isLastStep
-              ? 'Concluída (Totalmente Aprovada)'
-              : nextStep?.nome || 'Próxima Alçada',
-            etapas: updatedEtapas,
-          },
-        };
-      })
-    );
-    return updated;
-  }
-
-  validateRequest(
-    id: string,
-    parecer = 'Validado tecnicamente conforme normas corporativas e orçamentos anexados.',
-    autor = 'Auditoria & Compliance'
-  ): boolean {
-    let updated = false;
-    const nowIso = new Date().toISOString();
-    const nowFormatted = new Date().toLocaleString('pt-BR');
-
-    this._requests.update((list) =>
-      list.map((req) => {
-        if (req.id !== id) return req;
-        updated = true;
-
-        const currentStepIndex = req.fluxoDestinado.etapas.findIndex(
-          (e) => e.status === 'PENDENTE' || e.status === 'EM_ANALISE' || e.status === 'AJUSTE'
-        );
-
-        const updatedEtapas = req.fluxoDestinado.etapas.map((step, idx) => {
-          if (idx === currentStepIndex) {
-            return {
-              ...step,
-              comentario: `Validação técnica realizada por ${autor}: ${parecer} (${nowFormatted})`,
-            };
-          }
-          return step;
-        });
-
-        return {
-          ...req,
-          dataAtualizacao: nowIso,
-          fluxoDestinado: {
-            ...req.fluxoDestinado,
-            etapas: updatedEtapas,
-          },
-        };
-      })
-    );
-    return updated;
-  }
-
-  requestAdjustment(id: string, motivo: string, autor = 'Comitê de Alçadas'): boolean {
-    let updated = false;
-    const nowIso = new Date().toISOString();
-    const nowFormatted = new Date().toLocaleString('pt-BR');
-
-    this._requests.update((list) =>
-      list.map((req) => {
-        if (req.id !== id) return req;
-        updated = true;
-
-        const updatedEtapas = req.fluxoDestinado.etapas.map((step) => {
-          if (step.status === 'PENDENTE' || step.status === 'EM_ANALISE') {
-            return {
-              ...step,
-              status: 'AJUSTE' as const,
-              dataHora: nowFormatted,
-              comentario: `Ajuste solicitado por ${autor}: ${motivo}`,
-            };
-          }
-          return step;
-        });
-
-        return {
-          ...req,
-          status: 'AJUSTE_SOLICITADO' as const,
-          statusLabel: 'Requer Ajuste',
-          statusIcon: 'edit_note',
-          dataAtualizacao: nowIso,
-          fluxoDestinado: {
-            ...req.fluxoDestinado,
-            etapaAtualNome: 'Aguardando Revisão do Solicitante',
-            etapas: updatedEtapas,
-          },
-        };
-      })
-    );
-    return updated;
-  }
-
-  rejectRequest(id: string, motivo: string, autor = 'Diretoria de Alçadas'): boolean {
-    let updated = false;
-    const nowIso = new Date().toISOString();
-    const nowFormatted = new Date().toLocaleString('pt-BR');
-
-    this._requests.update((list) =>
-      list.map((req) => {
-        if (req.id !== id) return req;
-        updated = true;
-
-        const updatedEtapas = req.fluxoDestinado.etapas.map((step) => {
-          if (step.status === 'PENDENTE' || step.status === 'EM_ANALISE') {
-            return {
-              ...step,
-              status: 'REJEITADA' as const,
-              dataHora: nowFormatted,
-              comentario: `Rejeitado por ${autor}: ${motivo}`,
-            };
-          }
-          return step;
-        });
-
-        return {
-          ...req,
-          status: 'REJEITADA' as const,
-          statusLabel: 'Recusada',
-          statusIcon: 'cancel',
-          dataAtualizacao: nowIso,
-          fluxoDestinado: {
-            ...req.fluxoDestinado,
-            etapaAtualNome: 'Fluxo Encerrado (Reprovado)',
-            etapas: updatedEtapas,
-          },
-        };
-      })
-    );
-    return updated;
-  }
-
-  approveBatch(ids: string[], signatureImg?: string): number {
-    let count = 0;
-    ids.forEach((id) => {
-      if (this.approveRequest(id, signatureImg, 'Aprovação em lote autorizada pela gestão de alçadas.')) {
-        count++;
-      }
-    });
-    return count;
-  }
 }

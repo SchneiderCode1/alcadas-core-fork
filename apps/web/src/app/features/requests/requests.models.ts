@@ -5,14 +5,6 @@ export type RequestStatus = StatusSolicitacao;
 
 export type ApprovalStepStatus = 'CONCLUIDA' | 'EM_ANALISE' | 'PENDENTE' | 'REJEITADA' | 'AJUSTE';
 
-export interface StepSignature {
-  signatario: string;
-  cargo: string;
-  dataHora: string;
-  hashSha256: string;
-  assinaturaImg?: string;
-}
-
 export interface ApprovalStep {
   numero: number;
   nome: string;
@@ -21,7 +13,8 @@ export interface ApprovalStep {
   status: ApprovalStepStatus;
   dataHora?: string;
   comentario?: string;
-  assinatura?: StepSignature;
+  /** Hash SHA-256 do elo da trilha que registrou a etapa (ADR-006). */
+  hashSha256?: string;
 }
 
 export interface WorkflowDestination {
@@ -96,6 +89,9 @@ export interface CreateRequestDto {
 }
 
 export type DecisionAction = 'aprovar' | 'rejeitar' | 'ajuste';
+
+/** Tamanho mínimo do motivo ao rejeitar ou pedir ajuste (CA-03.2), igual ao validador da API. */
+export const MOTIVO_MINIMO_DA_DECISAO = 10;
 
 /** Estado de carregamento de uma tela ou bloco (RNF08). */
 export type LoadState = 'carregando' | 'pronto' | 'erro';

@@ -6,7 +6,7 @@ import { APP_CONFIG } from '../../../core/config/app-config';
 import { eloDaApi, solicitacaoDaApi, tetoDaApi } from '../../../core/testing/api-fixtures';
 import { CONFIG_DE_TESTE } from '../../../core/testing/test-config';
 import { RequestItem } from '../requests.models';
-import { RequestsService } from './requests.service';
+import { RequestsService, ResultadoEmLote } from './requests.service';
 
 describe('RequestsService', () => {
   let service: RequestsService;
@@ -122,4 +122,29 @@ describe('RequestsService', () => {
 
     expect(nomes).toEqual(['Solicitação criada']);
   });
+
+  it('ensureLoaded só busca de novo se a lista ainda não foi carregada', () => {
+    service.ensureLoaded();
+    responderCarga();
+
+    service.ensureLoaded();
+    http.expectNone('/api/solicitacoes?page=1&limit=50');
+    expect(service.getRequestById('sol-001')?.valor).toBe(3200);
+  });
+
+  it('aprovação em lote: segue mesmo com falha em uma e devolve o resumo', () => {
+    service.load();
+    responderCarga([solicitacaoDaApi({ id: 'sol-001' }), solicitacaoDaApi({ id: 'sol-002', versao: 3 })]);
+    let resultado: ResultadoEmLote | undefined;
+
+    service.approveMany(service.requests(), 'Ok').subscribe((r) => (resultado = r));
+
+    const segunda = http.expectOne('/api/solicitacoes/sol-002/aprovar');
+    expect(segunda.request.body).toEqual({ versao: 3, observacao: 'Ok' });
+    segunda.flush({ message: 'Conflito de concorrência.' }, { status: 409, statusText: 'Conflict' });
+    http.expectOne('/api/solicitacoes/sol-001/aprovar').flush(solicitacaoDaApi({ id: 'sol-001', status: 'APROVADA', versao: 2 }));
+
+    expect(resultado).toEqual({ aprovadas: 1, erros: ['#SOL-002: Conflito de concorrência.'] });
+  });
 });
+

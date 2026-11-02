@@ -1,30 +1,24 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { JUSTIFICATIVA_MINIMA_ACIMA_DA_BASE, justificativaSuficiente } from '@alcadas-core/models';
+import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { podeDecidir } from '../../core/auth/roles';
 import { mensagemDeErroDaApi } from '../../core/http/api-error';
-import { ActivatedRoute, Router } from '@angular/router';
-import { RightDrawerComponent } from '../../shared/components/right-drawer/right-drawer.component';
 import { PageHeaderComponent, PageHeaderTab } from '../../shared/components/page-header/page-header.component';
 import { RightDrawerComponent } from '../../shared/components/right-drawer/right-drawer.component';
-import { fluxoDaAlcada } from './requests.mapper';
 import {
   ApprovalStep,
   DecisionAction,
   LoadState,
+  MOTIVO_MINIMO_DA_DECISAO,
   RequestItem,
   RequestStatus,
-  WorkflowDestination,
 } from './requests.models';
 import { RequestsService } from './services/requests.service';
 
 export type RequestTab = 'todas' | 'pendentes' | 'aprovadas' | 'ajustes' | 'rejeitadas';
 export type RequestSort = 'recentes' | 'maior_valor' | 'menor_valor';
-
-/** Motivo mínimo para rejeitar ou pedir ajuste (CA-03.2). */
-export const MOTIVO_MINIMO_DA_DECISAO = 10;
 
 const STATUS_POR_ABA: Record<Exclude<RequestTab, 'todas'>, RequestStatus> = {
   pendentes: 'PENDENTE',
@@ -52,19 +46,6 @@ export class RequestsComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
-  goToCreatePage(): void {
-    this.router.navigate(['/solicitacoes/nova']);
-  }
-
-  constructor() {
-    const params = this.route.snapshot.queryParams;
-    if (params && params['criada'] === 'true') {
-      setTimeout(() => {
-        this.showToast('Nova solicitação submetida com sucesso à esteira de aprovação!', 'success');
-      }, 100);
-    }
-  }
-
   // Filtros e navegação
   readonly currentTab = signal<RequestTab>('todas');
   readonly searchQuery = signal<string>('');
@@ -90,7 +71,6 @@ export class RequestsComponent implements OnInit {
   readonly pageSize = signal<number>(10);
 
   // Drawers
-  readonly isCreateDrawerOpen = signal<boolean>(false);
   readonly isDetailDrawerOpen = signal<boolean>(false);
   readonly selectedRequest = signal<RequestItem | null>(null);
 
@@ -98,21 +78,6 @@ export class RequestsComponent implements OnInit {
   readonly toastMessage = signal<string | null>(null);
   readonly toastType = signal<'success' | 'warning' | 'info'>('success');
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
-
-  // Formulário de criação (US-02)
-  readonly isSubmitting = signal<boolean>(false);
-  readonly formCategoria = signal<string>(this.requestsService.categories[0]?.id ?? '');
-  readonly formCentroCustoId = signal<string>('');
-  readonly formValor = signal<number | null>(null);
-  readonly formJustificativa = signal<string>('');
-  readonly formErrors = signal<Record<string, string>>({});
-  readonly justificativaMinima = JUSTIFICATIVA_MINIMA_ACIMA_DA_BASE;
-
-  /** A justificativa longa só é exigida acima do limite base da categoria (RN02). */
-  readonly exigeJustificativaLonga = computed(() => {
-    const categoria = this.requestsService.categories.find((c) => c.id === this.formCategoria());
-    return categoria !== undefined && (this.formValor() ?? 0) > categoria.limiteBase;
-  });
 
   // Detalhe: trilha (US-07) e decisão do aprovador (US-03)
   readonly trailSteps = signal<ApprovalStep[]>([]);
@@ -123,10 +88,6 @@ export class RequestsComponent implements OnInit {
   readonly motivoMinimo = MOTIVO_MINIMO_DA_DECISAO;
 
   readonly stats = this.requestsService.stats;
-
-  readonly suggestedWorkflow = computed<WorkflowDestination>(() =>
-    fluxoDaAlcada(this.formValor() ?? 0, 'PENDENTE', this.requestsService.tiers()),
-  );
 
   /** Pode decidir: aprovador, solicitação pendente e não ser o autor (SoD — CA-04.1). */
   readonly canDecideSelected = computed(() => {
@@ -176,6 +137,9 @@ export class RequestsComponent implements OnInit {
 
   ngOnInit(): void {
     this.requestsService.load();
+    if (this.route.snapshot.queryParamMap.get('criada') === 'true') {
+      this.showToast('Solicitação criada e enviada para aprovação.', 'success');
+    }
   }
 
   reload(): void {
@@ -248,43 +212,9 @@ export class RequestsComponent implements OnInit {
     this.selectedIds.set(selecionados);
   }
 
-  // Criação
-  // Navegação para a página de criação de nova solicitação
-  openCreateDrawer(): void {
-    this.goToCreatePage();
-  }
-
-  closeCreateDrawer(): void {
-    this.isCreateDrawerOpen.set(false);
-  }
-
-  submitNewRequest(): void {
-    const erros = this.validarFormulario();
-    this.formErrors.set(erros);
-    if (Object.keys(erros).length > 0) {
-      return;
-    }
-
-    this.isSubmitting.set(true);
-    this.requestsService
-      .create({
-        centroCustoId: this.formCentroCustoId(),
-        categoria: this.formCategoria(),
-        valor: this.formValor() ?? 0,
-        justificativa: this.formJustificativa().trim(),
-      })
-      .subscribe({
-        next: (criada) => {
-          this.isSubmitting.set(false);
-          this.closeCreateDrawer();
-          this.showToast(`Solicitação ${criada.codigo} criada e enviada para aprovação.`, 'success');
-          this.openDetailDrawer(criada);
-        },
-        error: (erro: unknown) => {
-          this.isSubmitting.set(false);
-          this.formErrors.set({ geral: mensagemDeErroDaApi(erro) });
-        },
-      });
+  // Criação (US-02) — página própria
+  goToCreatePage(): void {
+    void this.router.navigate(['/solicitacoes/nova']);
   }
 
   // Detalhe e trilha
@@ -389,41 +319,6 @@ export class RequestsComponent implements OnInit {
       clearTimeout(this.toastTimer);
     }
   }
-
-  private resetCreateForm(): void {
-    this.formCategoria.set(this.requestsService.categories[0]?.id ?? '');
-    this.formCentroCustoId.set(this.requestsService.costCenters()[0]?.id ?? '');
-    this.formValor.set(null);
-    this.formJustificativa.set('');
-    this.formErrors.set({});
-  }
-
-  private validarFormulario(): Record<string, string> {
-    const erros: Record<string, string> = {};
-    const valor = this.formValor();
-    const justificativa = this.formJustificativa().trim();
-
-    if (!this.formCentroCustoId()) {
-      erros['centroCusto'] = 'Selecione o centro de custo.';
-    }
-    if (!this.formCategoria()) {
-      erros['categoria'] = 'Selecione a categoria da despesa.';
-    }
-    if (valor === null || !(valor > 0) || !temAteDuasCasasDecimais(valor)) {
-      erros['valor'] = 'Informe um valor maior que R$ 0,00, com até 2 casas decimais.';
-    }
-    if (!justificativa) {
-      erros['justificativa'] = 'Informe a justificativa da solicitação.';
-    } else if (!justificativaSuficiente(this.formCategoria(), valor ?? 0, justificativa)) {
-      erros['justificativa'] =
-        `Acima do limite da categoria, a justificativa exige ao menos ${JUSTIFICATIVA_MINIMA_ACIMA_DA_BASE} caracteres (atual: ${justificativa.length}).`;
-    }
-    return erros;
-  }
-}
-
-function temAteDuasCasasDecimais(valor: number): boolean {
-  return Math.abs(Math.round(valor * 100) - valor * 100) < 1e-6;
 }
 
 function ordenar(lista: RequestItem[], criterio: RequestSort): RequestItem[] {
