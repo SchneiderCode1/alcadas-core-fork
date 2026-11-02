@@ -1,0 +1,230 @@
+:host {
+  display: block;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.settings-workspace {
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  height: 100%;
+  width: 100%;
+  background: #f8fafc;
+  transition: grid-template-columns 0.2s ease;
+
+  &.subnav-collapsed {
+    grid-template-columns: 64px minmax(0, 1fr);
+
+    .settings-subnav {
+      padding: 1.25rem 0.6rem;
+
+      .subnav-header {
+        justify-content: center;
+      }
+
+      .subnav-list a {
+        justify-content: center;
+        padding: 0.6rem;
+      }
+    }
+  }
+}
+
+.settings-subnav {
+  display: flex;
+  flex-direction: column;
+  padding: 1.35rem 0.9rem;
+  background: #f8fafc;
+  overflow-y: auto;
+  user-select: none;
+
+  .subnav-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0.55rem;
+    margin-bottom: 1.25rem;
+    min-height: 32px;
+
+    .subnav-title {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #0f172a;
+      letter-spacing: -0.015em;
+    }
+
+    .btn-collapse-subnav {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      border: 1px solid #e2e8f0;
+      background: #ffffff;
+      color: #64748b;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+
+      .material-symbols-rounded {
+        font-size: 16px;
+      }
+
+      &:hover {
+        color: #0f172a;
+        border-color: #cbd5e1;
+        background: #f1f5f9;
+      }
+    }
+  }
+
+  .subnav-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 1.35rem;
+  }
+
+  .subnav-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+
+    .group-caption {
+      padding: 0 0.65rem;
+      font-size: 0.6875rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #94a3b8;
+    }
+  }
+
+  .subnav-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+
+    a {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 0.55rem 0.7rem;
+      border-radius: 10px;
+      color: #475569;
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+      border: 1px solid transparent;
+      transition: all 0.15s ease;
+
+      .nav-icon {
+        font-size: 19px;
+        color: #64748b;
+        transition: color 0.15s ease;
+      }
+
+      .nav-label {
+        flex: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .nav-badge {
+        font-size: 0.65rem;
+        font-weight: 700;
+        padding: 0.1rem 0.42rem;
+        border-radius: 999px;
+        background: #ede9fe;
+        color: #644ef3;
+      }
+
+      .external-arrow {
+        font-size: 14px;
+        color: #94a3b8;
+      }
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.75);
+        color: #0f172a;
+
+        .nav-icon {
+          color: #0f172a;
+        }
+      }
+
+      &.active {
+        background: #ffffff;
+        color: #0f172a;
+        font-weight: 600;
+        border-color: #eef2f6;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+
+        .nav-icon {
+          color: #0f172a;
+        }
+      }
+    }
+  }
+}
+
+.settings-content-card {
+  background: #ffffff;
+  border: 1px solid #eef2f6;
+  border-radius: 18px;
+  margin: 0.65rem 0.65rem 0.65rem 0;
+  padding: 2.25rem 2.75rem 3.5rem;
+  overflow-y: auto;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.02);
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 999px;
+  }
+}
+
+@media (max-width: 900px) {
+  .settings-workspace,
+  .settings-workspace.subnav-collapsed {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .settings-subnav {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #eef2f6;
+
+    .subnav-header,
+    .group-caption {
+      display: none;
+    }
+
+    .subnav-groups {
+      flex-direction: row;
+      gap: 0.5rem;
+      overflow-x: auto;
+    }
+
+    .subnav-list {
+      flex-direction: row;
+      gap: 0.35rem;
+    }
+  }
+
+  .settings-content-card {
+    margin: 0;
+    border-radius: 0;
+    border: none;
+    padding: 1.5rem 1.25rem 3rem;
+  }
+}

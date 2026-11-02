@@ -66,6 +66,10 @@ export class SidebarComponent {
     if (url.includes('/auditoria')) return 'auditoria';
     if (url.includes('/riscos')) return 'riscos';
     if (url.includes('/delegacoes')) return 'delegacoes';
+    if (url.includes('/configuracoes/organizacao') || url.includes('/configuracoes/empresa')) {
+      return 'organizacao';
+    }
+    if (url.includes('/configuracoes')) return 'configuracoes';
     return 'dashboard';
   });
 
@@ -85,6 +89,7 @@ export class SidebarComponent {
     { id: 'auditoria', route: '/auditoria', label: 'Trilha Criptográfica', icon: 'link', badge: 'SHA', badgeColor: '#10B981', hasSubmenu: false },
     { id: 'riscos', route: '/riscos', label: 'Motor de Riscos', icon: 'security', badge: 'Anti-Fraude', badgeColor: '#F59E0B', hasSubmenu: false },
     { id: 'delegacoes', route: '/delegacoes', label: 'Delegações & SoD', icon: 'group', hasSubmenu: false },
+    { id: 'organizacao', route: '/configuracoes/organizacao', label: 'Organização & Empresa', icon: 'domain', hasSubmenu: false },
   ]);
 
   readonly departments = signal<DepartmentItem[]>([

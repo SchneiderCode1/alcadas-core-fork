@@ -1,0 +1,238 @@
+<div class="settings-page-wrapper">
+  <header class="settings-identity-header">
+    <div class="identity-left">
+      <div
+        class="identity-avatar-box"
+        style="background: linear-gradient(135deg, #059669 0%, #047857 100%)"
+        aria-hidden="true"
+      >
+        <span class="material-symbols-rounded">lock</span>
+      </div>
+      <div class="identity-titles">
+        <h1>Segurança & Acesso</h1>
+        <p>Gerencie sua senha corporativa, autenticação em 2 etapas (2FA) e dispositivos conectados.</p>
+      </div>
+    </div>
+  </header>
+
+  <nav class="settings-tabs-nav" aria-label="Abas de segurança">
+    <button
+      type="button"
+      class="settings-tab-btn"
+      [class.active]="activeTab() === 'password'"
+      (click)="activeTab.set('password')"
+    >
+      <span>Senha de Acesso</span>
+    </button>
+
+    <button
+      type="button"
+      class="settings-tab-btn"
+      [class.active]="activeTab() === '2fa'"
+      (click)="activeTab.set('2fa')"
+    >
+      <span>Autenticação 2FA</span>
+    </button>
+
+    <button
+      type="button"
+      class="settings-tab-btn"
+      [class.active]="activeTab() === 'sessions'"
+      (click)="activeTab.set('sessions')"
+    >
+      <span>Sessões Ativas</span>
+      <span class="tab-badge">{{ sessions().length }}</span>
+    </button>
+  </nav>
+
+  @if (activeTab() === 'password') {
+    <form [formGroup]="form" (ngSubmit)="save()" (input)="saved.set(false)" novalidate>
+      <section class="settings-section-block">
+        <div class="section-header-bar">
+          <div class="section-title-group">
+            <h2>Alterar Senha</h2>
+          </div>
+        </div>
+
+        <div class="settings-field-row">
+          <div class="field-meta">
+            <label class="field-label-title" for="currentPassword">
+              <span>Senha atual</span>
+              <span class="req">*</span>
+            </label>
+            <p class="field-description">
+              Confirme sua senha atual antes de definir uma nova credencial.
+            </p>
+          </div>
+          <div class="field-control">
+            <input
+              id="currentPassword"
+              type="password"
+              class="settings-input"
+              formControlName="currentPassword"
+              autocomplete="current-password"
+              [class.invalid]="invalid('currentPassword')"
+            />
+            @if (invalid('currentPassword')) {
+              <span class="field-error">Informe a senha atual.</span>
+            }
+          </div>
+        </div>
+
+        <div class="settings-field-row">
+          <div class="field-meta">
+            <label class="field-label-title" for="newPassword">
+              <span>Nova senha</span>
+              <span class="req">*</span>
+            </label>
+            <p class="field-description">
+              Deve conter no mínimo 8 caracteres com letras e números.
+            </p>
+          </div>
+          <div class="field-control">
+            <input
+              id="newPassword"
+              type="password"
+              class="settings-input"
+              formControlName="newPassword"
+              autocomplete="new-password"
+              [class.invalid]="invalid('newPassword')"
+            />
+            @if (invalid('newPassword')) {
+              <span class="field-error">A nova senha precisa ter ao menos 8 caracteres.</span>
+            }
+          </div>
+        </div>
+
+        <div class="settings-field-row">
+          <div class="field-meta">
+            <label class="field-label-title" for="confirmPassword">
+              <span>Confirmar nova senha</span>
+              <span class="req">*</span>
+            </label>
+            <p class="field-description">
+              Repita a nova senha para evitar erros de digitação.
+            </p>
+          </div>
+          <div class="field-control">
+            <input
+              id="confirmPassword"
+              type="password"
+              class="settings-input"
+              formControlName="confirmPassword"
+              autocomplete="new-password"
+              [class.invalid]="
+                invalid('confirmPassword') ||
+                (form.errors?.['mismatch'] && form.controls.confirmPassword.touched)
+              "
+            />
+            @if (form.errors?.['mismatch'] && form.controls.confirmPassword.touched) {
+              <span class="field-error">As senhas não coincidem.</span>
+            }
+          </div>
+        </div>
+      </section>
+
+      <div class="settings-actions-bar">
+        <div class="actions-left">
+          <button type="submit" class="btn-settings primary">
+            <span class="material-symbols-rounded">key</span>
+            <span>Atualizar senha</span>
+          </button>
+        </div>
+        @if (saved()) {
+          <div class="save-feedback" role="status">
+            <span class="material-symbols-rounded">check_circle</span>
+            <span>Senha atualizada com sucesso.</span>
+          </div>
+        }
+      </div>
+    </form>
+  }
+
+  @if (activeTab() === '2fa') {
+    <section class="settings-section-block">
+      <div class="section-header-bar">
+        <div class="section-title-group">
+          <h2>Autenticação Multifator (MFA / 2FA)</h2>
+        </div>
+      </div>
+
+      <div class="settings-field-row">
+        <div class="field-meta">
+          <span class="field-label-title">Aplicativo Autenticador (TOTP)</span>
+          <p class="field-description">
+            Exige código temporário de 6 dígitos (Google Authenticator / Authy) ao entrar.
+          </p>
+        </div>
+        <div class="field-control">
+          <label class="settings-switch">
+            <input
+              type="checkbox"
+              [checked]="twoFactorEnabled()"
+              (change)="twoFactorEnabled.set(!twoFactorEnabled())"
+            />
+            <span class="switch-track"></span>
+            <span class="switch-label">
+              {{ twoFactorEnabled() ? 'Proteção 2FA Ativa' : '2FA Desativado' }}
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-field-row">
+        <div class="field-meta">
+          <span class="field-label-title">Validação por Token em Aprovações Críticas</span>
+          <p class="field-description">
+            Solicitar confirmação extra ao assinar requisições acima de R$ 25.000,00.
+          </p>
+        </div>
+        <div class="field-control">
+          <label class="settings-switch">
+            <input
+              type="checkbox"
+              [checked]="biometricApproval()"
+              (change)="biometricApproval.set(!biometricApproval())"
+            />
+            <span class="switch-track"></span>
+            <span class="switch-label">Exigir segundo fator antes de assinar contratos</span>
+          </label>
+        </div>
+      </div>
+    </section>
+  }
+
+  @if (activeTab() === 'sessions') {
+    <section class="settings-section-block">
+      <div class="section-header-bar">
+        <div class="section-title-group">
+          <h2>Dispositivos & Sessões Conectadas</h2>
+          <p>Revogue o acesso de dispositivos que você não reconhece.</p>
+        </div>
+      </div>
+
+      @for (s of sessions(); track s.id) {
+        <div class="settings-field-row">
+          <div class="field-meta">
+            <span class="field-label-title">{{ s.device }}</span>
+            <p class="field-description">{{ s.ip }}</p>
+          </div>
+          <div class="field-control" style="flex-direction: row; align-items: center; justify-content: space-between">
+            <span class="settings-pill" [class.success]="s.current">
+              {{ s.lastActive }}
+            </span>
+            @if (!s.current) {
+              <button
+                type="button"
+                class="btn-settings danger"
+                (click)="revokeSession(s.id)"
+              >
+                Encerrar sessão
+              </button>
+            }
+          </div>
+        </div>
+      }
+    </section>
+  }
+</div>

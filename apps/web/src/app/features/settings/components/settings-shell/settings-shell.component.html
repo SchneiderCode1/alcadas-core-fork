@@ -1,0 +1,80 @@
+<div class="settings-workspace" [class.subnav-collapsed]="isNavCollapsed()">
+  <!-- Painel Lateral de Configurações (Inspirado na Imagem de Referência) -->
+  <aside class="settings-subnav" aria-label="Navegação de Configurações">
+    <div class="subnav-header">
+      @if (!isNavCollapsed()) {
+        <h2 class="subnav-title">Configurações</h2>
+      }
+      <button
+        type="button"
+        class="btn-collapse-subnav"
+        (click)="toggleSubnav()"
+        [attr.aria-label]="isNavCollapsed() ? 'Expandir painel de configurações' : 'Recolher painel de configurações'"
+        [title]="isNavCollapsed() ? 'Expandir menu' : 'Recolher menu'"
+      >
+        <span class="material-symbols-rounded">
+          {{ isNavCollapsed() ? 'dock_to_right' : 'dock_to_left' }}
+        </span>
+      </button>
+    </div>
+
+    <div class="subnav-groups">
+      <div class="subnav-group">
+        @if (!isNavCollapsed()) {
+          <span class="group-caption">Conta Pessoal</span>
+        }
+        <ul class="subnav-list">
+          @for (item of personalItems; track item.path) {
+            <li>
+              <a
+                [routerLink]="item.path"
+                routerLinkActive="active"
+                ariaCurrentWhenActive="page"
+                [title]="isNavCollapsed() ? item.label : ''"
+              >
+                <span class="material-symbols-rounded nav-icon">{{ item.icon }}</span>
+                @if (!isNavCollapsed()) {
+                  <span class="nav-label">{{ item.label }}</span>
+                }
+              </a>
+            </li>
+          }
+        </ul>
+      </div>
+
+      <div class="subnav-group">
+        @if (!isNavCollapsed()) {
+          <span class="group-caption">Gestão Corporativa</span>
+        }
+        <ul class="subnav-list">
+          @for (item of workspaceItems; track item.path) {
+            <li>
+              <a
+                [routerLink]="item.path"
+                routerLinkActive="active"
+                ariaCurrentWhenActive="page"
+                [title]="isNavCollapsed() ? item.label : ''"
+              >
+                <span class="material-symbols-rounded nav-icon">{{ item.icon }}</span>
+                @if (!isNavCollapsed()) {
+                  <span class="nav-label">{{ item.label }}</span>
+                  @if (item.badge) {
+                    <span class="nav-badge">{{ item.badge }}</span>
+                  }
+                  @if (item.externalHint) {
+                    <span class="material-symbols-rounded external-arrow">north_east</span>
+                  }
+                }
+              </a>
+            </li>
+          }
+        </ul>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Superfície Principal Arredondada (Card Branco de Conteúdo) -->
+  <main class="settings-content-card">
+    <router-outlet />
+  </main>
+</div>

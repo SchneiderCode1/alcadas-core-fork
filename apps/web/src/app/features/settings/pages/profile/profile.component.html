@@ -1,0 +1,508 @@
+<div class="settings-page-wrapper">
+  <!-- 1. Cabeçalho de Identidade do Perfil (Idêntico ao Mockup de Referência) -->
+  <header class="settings-identity-header">
+    <div class="identity-left">
+      <div
+        class="identity-avatar-box"
+        [style.background]="user().avatarColor"
+        aria-hidden="true"
+      >
+        {{ initials() }}
+      </div>
+      <div class="identity-titles">
+        <h1>Perfil</h1>
+        <p>Gerencie seus detalhes pessoais, contatos e perfil público de aprovador.</p>
+      </div>
+    </div>
+
+    <div class="identity-actions">
+      <a routerLink="/configuracoes/organizacao" class="btn-settings">
+        <span class="material-symbols-rounded">domain</span>
+        <span>Gerir Organização</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- 2. Barra de Abas Horizontais com Underline -->
+  <nav class="settings-tabs-nav" aria-label="Abas do perfil pessoal">
+    <button
+      type="button"
+      class="settings-tab-btn"
+      [class.active]="activeTab() === 'details'"
+      (click)="selectTab('details')"
+    >
+      <span>Detalhes</span>
+    </button>
+
+    <button
+      type="button"
+      class="settings-tab-btn"
+      [class.active]="activeTab() === 'contacts'"
+      (click)="selectTab('contacts')"
+    >
+      <span>Contatos & E-mails</span>
+      <span class="tab-badge">{{ user().additionalEmails.length }}</span>
+    </button>
+
+    <button
+      type="button"
+      class="settings-tab-btn"
+      [class.active]="activeTab() === 'authority'"
+      (click)="selectTab('authority')"
+    >
+      <span>Alçada & Assinatura</span>
+    </button>
+
+    <button
+      type="button"
+      class="settings-tab-btn"
+      [class.active]="activeTab() === 'history'"
+      (click)="selectTab('history')"
+    >
+      <span>Histórico de Atuação</span>
+    </button>
+  </nav>
+
+  <form [formGroup]="form" (ngSubmit)="save()" novalidate>
+    <!-- =================================================================== -->
+    <!-- ABA 1: DETALHES PESSOAIS                                            -->
+    <!-- =================================================================== -->
+    @if (activeTab() === 'details') {
+      <section class="settings-section-block">
+        <div class="section-header-bar">
+          <div class="section-title-group">
+            <h2>Detalhes</h2>
+          </div>
+          <span class="settings-pill success">
+            <span class="material-symbols-rounded" style="font-size: 14px">verified</span>
+            <span>Conta Verificada</span>
+          </span>
+        </div>
+
+        <!-- Linha 1: Perfil / Identificação Pública -->
+        <div class="settings-field-row">
+          <div class="field-meta">
+            <label class="field-label-title" for="displayName">
+              <span>Perfil</span>
+              <span class="req">*</span>
+            </label>
+            <p class="field-description">
+              Como seu nome curto é exibido em comentários e trilhas de aprovação.
+            </p>
+          </div>
+          <div class="field-control">
+            <input
+              id="displayName"
+              class="settings-input"
+              formControlName="displayName"
+              placeholder="Ex: Julia Santana"
+              [class.invalid]="form.controls.displayName.touched && form.controls.displayName.invalid"
+            />
+            @if (form.controls.displayName.touched && form.controls.displayName.invalid) {
+              <span class="field-error">Informe o nome de exibição do perfil.</span>
+            }
+          </div>
+        </div>
+
+        <!-- Linha 2: Foto & Cor de Avatar -->
+        <div class="settings-field-row">
+          <div class="field-meta">
+            <span class="field-label-title">Foto</span>
+            <p class="field-description">
+              Será exibida no seu perfil e nos comprovantes de deliberação.
+            </p>
+          </div>
+          <div class="field-control">
+            <div class="photo-picker-row">
+              <div
+                class="avatar-preview-lg"
+                [style.background]="user().avatarColor"
+              >
+                {{ initials() }}
+              </div>
+              <div class="color-swatches-group">
+                <span class="swatch-label">Cor de destaque do avatar:</span>
+                <div class="swatches-list">
+                  @for (color of avatarColors; track color) {
+                    <button
+                      type="button"
+                      class="color-swatch-btn"
+                      [style.background-color]="color"
+                      [class.selected]="user().avatarColor === color"
+                      (click)="selectAvatarColor(color)"
+                      [attr.aria-label]="'Selecionar cor ' + color"
+                    ></button>
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Linha 3: Nome Completo -->
+        <div class="settings-field-row">
+          <div class="field-meta">
+            <label class="field-label-title" for="fullName">
+              <span>Nome completo</span>
+              <span class="req">*</span>
+            </label>
+            <p class="field-description">
+              Será exibido no seu perfil e nos termos jurídicos de assinatura.
+            </p>
+          </div>
+          <div class="field-control">
+            <input
+              id="fullName"
+              class="settings-input"
+              formControlName="fullName"
+              placeholder="Ex: Julia Campos Santana"
+              [class.invalid]="form.controls.fullName.touched && form.controls.fullName.invalid"
+            />
+            @if (form.controls.fullName.touched && form.controls.fullName.invalid) {
+              <span class="field-error">Informe o seu nome completo.</span>
+            }
+          </div>
+        </div>
+
+        <!-- Linha 4: CPF / Identificação Fiscal Pessoal -->
+        <div class="settings-field-row">
+          <div class="field-meta">
+            <label class="field-label-title" for="cpf">
+              <span>CPF do titular</span>
+              <span class="req">*</span>
+            </label>
+            <p class="field-description">
+              Vinculado ao certificado digital para assinatura de solicitações.
+            </p>
+          </div>
+          <div class="field-control">
+            <input
+              id="cpf"
+              class="settings-input"
+              formControlName="cpf"
+              placeholder="000.000.000-00"
+              (input)="maskUserCpf()"
+              [class.invalid]="form.controls.cpf.touched && form.controls.cpf.invalid"
+            />
+          </div>
+        </div>
+
+        <!-- Linha 5: Biografia / Atuação -->
+        <div class="settings-field-row">
+          <div class="field-meta">
+            <label class="field-label-title" for="bio">
+              <span>Resumo de atuação</span>
+            </label>
+            <p class="field-description">
+              Breve descrição da sua área de responsabilidade nas esteiras de alçada.
+            </p>
+          </div>
+          <div class="field-control">
+            <textarea
+              id="bio"
+              class="settings-textarea"
+              formControlName="bio"
+              rows="3"
+            ></textarea>
+          </div>
+        </div>
+
+        <!-- Linha 6: Vínculo Organizacional (Somente leitura c/ atalho para Organização) -->
+        <div class="settings-field-row">
+          <div class="field-meta">
+            <span class="field-label-title">
+              <span>Vínculo corporativo</span>
+              <span class="req">*</span>
+            </span>
+            <p class="field-description">
+              Empresa, departamento e matrícula geridos na aba de Organização.
+            </p>
+          </div>
+          <div class="field-control">
+            <div class="readonly-org-card">
+              <div class="org-card-main">
+                <strong>{{ user().company }}</strong>
+                <span>CNPJ {{ user().cnpj }} · {{ user().department }} · {{ user().jobTitle }}</span>
+                <span class="emp-code-tag">Matrícula: {{ user().employeeId }}</span>
+              </div>
+              <a routerLink="/configuracoes/organizacao" class="btn-settings">
+                <span>Editar Empresa</span>
+                <span class="material-symbols-rounded">arrow_forward</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+    }
+
+    <!-- =================================================================== -->
+    <!-- ABA 2: CONTATOS & E-MAILS                                           -->
+    <!-- =================================================================== -->
+    @if (activeTab() === 'contacts') {
+      <section class="settings-section-block">
+        <div class="section-header-bar">
+          <div class="section-title-group">
+            <h2>Contatos & E-mails</h2>
+          </div>
+        </div>
+
+        <!-- E-mails de Contato -->
+        <div class="settings-field-row">
+          <div class="field-meta">
+            <span class="field-label-title">
+              <span>E-mail de contato</span>
+              <span class="req">*</span>
+            </span>
+            <p class="field-description">
+              Adicione ao menos um e-mail corporativo para receber notificações e tokens.
+            </p>
+          </div>
+          <div class="field-control">
+            <div class="emails-list-box">
+              @for (item of user().additionalEmails; track item.email) {
+                <div class="email-item-row">
+                  <div class="email-info">
+                    <span class="material-symbols-rounded mail-icon">mail</span>
+                    <span class="email-address">{{ item.email }}</span>
+                    @if (item.isPrimary) {
+                      <span class="settings-pill primary">Principal</span>
+                    }
+                    @if (item.verified) {
+                      <span class="settings-pill success">Verificado</span>
+                    }
+                  </div>
+                  <div class="email-actions">
+                    @if (!item.isPrimary) {
+                      <button
+                        type="button"
+                        class="btn-settings ghost"
+                        (click)="makePrimaryEmail(item.email)"
+                      >
+                        Tornar principal
+                      </button>
+                      <button
+                        type="button"
+                        class="btn-settings danger"
+                        (click)="removeEmail(item.email)"
+                      >
+                        Remover
+                      </button>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+
+            <div class="add-email-inline">
+              <input
+                type="email"
+                class="settings-input"
+                placeholder="Adicionar novo e-mail corporativo..."
+                [ngModel]="newContactEmail()"
+                (ngModelChange)="newContactEmail.set($event); emailError.set('')"
+                [ngModelOptions]="{ standalone: true }"
+                (keydown.enter)="$event.preventDefault(); addEmail()"
+              />
+              <button type="button" class="btn-settings" (click)="addEmail()">
+                <span class="material-symbols-rounded">add</span>
+                <span>Adicionar e-mail</span>
+              </button>
+            </div>
+            @if (emailError()) {
+              <span class="field-error">{{ emailError() }}</span>
+            }
+          </div>
+        </div>
+
+        <!-- Telefone Corporativo -->
+        <div class="settings-field-row">
+          <div class="field-meta">
+            <label class="field-label-title" for="phone">
+              <span>Telefone / WhatsApp</span>
+              <span class="req">*</span>
+            </label>
+            <p class="field-description">
+              Utilizado para alertas urgentes de vencimento de SLA e validação em 2 etapas.
+            </p>
+          </div>
+          <div class="field-control">
+            <input
+              id="phone"
+              class="settings-input"
+              formControlName="phone"
+              placeholder="+55 (61) 99999-0000"
+            />
+          </div>
+        </div>
+
+        <!-- Localização e Fuso Horário -->
+        <div class="settings-field-row">
+          <div class="field-meta">
+            <label class="field-label-title" for="location">
+              <span>Localização & Fuso horário</span>
+            </label>
+            <p class="field-description">
+              Define o carimbo de tempo (Timestamp) registrado nas suas aprovações.
+            </p>
+          </div>
+          <div class="field-control">
+            <div class="settings-subgrid">
+              <div class="col-3 sub-field">
+                <label for="location">Cidade / Unidade</label>
+                <input id="location" class="settings-input" formControlName="location" />
+              </div>
+              <div class="col-3 sub-field">
+                <label for="timezone">Fuso Horário</label>
+                <select id="timezone" class="settings-select" formControlName="timezone">
+                  <option value="America/Sao_Paulo (GMT-03:00)">America/Sao_Paulo (GMT-03:00)</option>
+                  <option value="America/Manaus (GMT-04:00)">America/Manaus (GMT-04:00)</option>
+                  <option value="Europe/Lisbon (GMT+00:00)">Europe/Lisbon (GMT+00:00)</option>
+                  <option value="America/New_York (GMT-05:00)">America/New_York (GMT-05:00)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    }
+
+    <!-- =================================================================== -->
+    <!-- ABA 3: MINHA ALÇADA & ASSINATURA                                    -->
+    <!-- =================================================================== -->
+    @if (activeTab() === 'authority') {
+      <section class="settings-section-block">
+        <div class="section-header-bar">
+          <div class="section-title-group">
+            <h2>Alçada de Aprovação & Assinatura Digital</h2>
+          </div>
+        </div>
+
+        <div class="settings-field-row">
+          <div class="field-meta">
+            <span class="field-label-title">Limite individual por solicitação</span>
+            <p class="field-description">
+              Valor máximo que você pode aprovar individualmente sem escalonamento.
+            </p>
+          </div>
+          <div class="field-control">
+            <div class="authority-highlight-box">
+              <span class="limit-amount">{{ formattedLimit() }}</span>
+              <span class="settings-pill primary">Nível Executivo · Ativo</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-field-row">
+          <div class="field-meta">
+            <span class="field-label-title">Papéis atribuídos (RBAC)</span>
+            <p class="field-description">
+              Perfis de governança concedidos pelo administrador da organização.
+            </p>
+          </div>
+          <div class="field-control">
+            <div class="pills-wrap">
+              @for (role of user().roles; track role) {
+                <span class="settings-pill primary">{{ role }}</span>
+              }
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-field-row">
+          <div class="field-meta">
+            <span class="field-label-title">Centros de custo habilitados</span>
+            <p class="field-description">
+              Unidades orçamentárias nas quais sua assinatura possui poder deliberativo.
+            </p>
+          </div>
+          <div class="field-control">
+            <div class="pills-wrap">
+              @for (cc of user().costCenters; track cc) {
+                <span class="settings-pill neutral">{{ cc }}</span>
+              }
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-field-row">
+          <div class="field-meta">
+            <label class="field-label-title" for="signatureStyle">
+              <span>Padrão de assinatura digital</span>
+              <span class="req">*</span>
+            </label>
+            <p class="field-description">
+              Método preferencial ao assinar contratos e aprovações na plataforma.
+            </p>
+          </div>
+          <div class="field-control">
+            <select id="signatureStyle" class="settings-select" formControlName="signatureStyle">
+              <option value="drawn">Rubrica Manuscrita em Canvas + Hash SHA-256</option>
+              <option value="certificate">Certificado Digital ICP-Brasil (e-CPF A3/Nuvem)</option>
+              <option value="typed">Assinatura Tipográfica Validada por Token 2FA</option>
+            </select>
+            <span class="cert-status-note">
+              <span class="material-symbols-rounded">verified_user</span>
+              <span>{{ user().certificateIssuer }} · Último acesso em {{ formattedLastAccess() }}</span>
+            </span>
+          </div>
+        </div>
+      </section>
+    }
+
+    <!-- =================================================================== -->
+    <!-- ABA 4: HISTÓRICO DE ATUAÇÃO                                         -->
+    <!-- =================================================================== -->
+    @if (activeTab() === 'history') {
+      <section class="settings-section-block">
+        <div class="section-header-bar">
+          <div class="section-title-group">
+            <h2>Últimas Deliberações Assinadas</h2>
+            <p>Registro imutável das solicitações aprovadas ou validadas por você.</p>
+          </div>
+        </div>
+
+        <div class="history-list">
+          @for (item of user().recentApprovals; track item.id) {
+            <div class="history-row-card">
+              <div class="history-main">
+                <div class="history-top">
+                  <span class="req-code">{{ item.code }}</span>
+                  <strong>{{ item.title }}</strong>
+                </div>
+                <span class="history-meta">
+                  {{ item.department }} · {{ item.date }} · Hash {{ item.hash }}
+                </span>
+              </div>
+              <div class="history-right">
+                <strong class="history-amount">{{ formatCurrency(item.amount) }}</strong>
+                <span class="settings-pill success">{{ item.action }}</span>
+              </div>
+            </div>
+          }
+        </div>
+      </section>
+    }
+
+    <!-- Barra de Ações do Formulário -->
+    @if (activeTab() !== 'history') {
+      <div class="settings-actions-bar">
+        <div class="actions-left">
+          <button type="submit" class="btn-settings primary">
+            <span class="material-symbols-rounded">check</span>
+            <span>Salvar alterações</span>
+          </button>
+          <button type="button" class="btn-settings" (click)="discard()">
+            <span>Descartar</span>
+          </button>
+        </div>
+
+        @if (savedFeedback()) {
+          <div class="save-feedback" role="status">
+            <span class="material-symbols-rounded">check_circle</span>
+            <span>Alterações do perfil salvas com sucesso.</span>
+          </div>
+        }
+      </div>
+    }
+  </form>
+</div>

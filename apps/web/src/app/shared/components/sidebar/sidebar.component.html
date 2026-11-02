@@ -119,9 +119,13 @@
       @if (!isCollapsed()) {
         <div class="group-title group-title-action">
           <span>Departamentos</span>
-          <button type="button" class="btn-add-action" title="Novo Centro de Custo">
+          <a
+            routerLink="/configuracoes/organizacao"
+            class="btn-add-action"
+            title="Gerir Departamentos e Centros de Custo"
+          >
             <span class="material-symbols-rounded btn-add-icon">add</span>
-          </button>
+          </a>
         </div>
       }
 

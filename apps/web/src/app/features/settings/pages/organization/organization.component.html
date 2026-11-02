@@ -1,0 +1,903 @@
+<div class="settings-page-wrapper">
+  <!-- 1. Cabeçalho de Identidade da Organização -->
+  <header class="settings-identity-header">
+    <div class="identity-left">
+      <div
+        class="identity-avatar-box"
+        style="background: linear-gradient(135deg, #644ef3 0%, #4338ca 100%)"
+        aria-hidden="true"
+      >
+        <span class="material-symbols-rounded">domain</span>
+      </div>
+      <div class="identity-titles">
+        <h1>Organização & Empresa</h1>
+        <p>
+          Gerencie os dados fiscais da empresa, departamentos, quadro de funcionários e políticas globais do projeto.
+        </p>
+      </div>
+    </div>
+
+    <div class="identity-actions">
+      @if (savedMessage()) {
+        <div class="save-toast-inline" role="status">
+          <span class="material-symbols-rounded">check_circle</span>
+          <span>{{ savedMessage() }}</span>
+        </div>
+      }
+    </div>
+  </header>
+
+  <!-- 2. Barra de Abas Horizontais com Underline -->
+  <nav class="settings-tabs-nav" aria-label="Abas da organização">
+    <button
+      type="button"
+      class="settings-tab-btn"
+      [class.active]="activeTab() === 'company'"
+      (click)="selectTab('company')"
+    >
+      <span>Empresa & Fiscal</span>
+    </button>
+
+    <button
+      type="button"
+      class="settings-tab-btn"
+      [class.active]="activeTab() === 'departments'"
+      (click)="selectTab('departments')"
+    >
+      <span>Departamentos & Centros de Custo</span>
+      <span class="tab-badge">{{ org().departments.length }}</span>
+    </button>
+
+    <button
+      type="button"
+      class="settings-tab-btn"
+      [class.active]="activeTab() === 'employees'"
+      (click)="selectTab('employees')"
+    >
+      <span>Funcionários & Colaboradores</span>
+      <span class="tab-badge">{{ org().employees.length }}</span>
+    </button>
+
+    <button
+      type="button"
+      class="settings-tab-btn"
+      [class.active]="activeTab() === 'policies'"
+      (click)="selectTab('policies')"
+    >
+      <span>Políticas do Projeto</span>
+    </button>
+  </nav>
+
+  <!-- ===================================================================== -->
+  <!-- ABA 1: DADOS DA EMPRESA & ENDEREÇO FISCAL                             -->
+  <!-- ===================================================================== -->
+  @if (activeTab() === 'company') {
+    <form [formGroup]="companyForm" (ngSubmit)="saveCompany()" novalidate>
+      <section class="settings-section-block">
+        <div class="section-header-bar">
+          <div class="section-title-group">
+            <h2>Dados da Empresa</h2>
+          </div>
+          <span class="settings-pill primary">CNPJ Homologado</span>
+        </div>
+
+        <!-- Nome Fantasia / Workspace -->
+        <div class="settings-field-row">
+          <div class="field-meta">
+            <label class="field-label-title" for="tradeName">
+              <span>Nome da organização</span>
+              <span class="req">*</span>
+            </label>
+            <p class="field-description">
+              Será exibido no cabeçalho lateral do sistema e relatórios.
+            </p>
+          </div>
+          <div class="field-control">
+            <input
+              id="tradeName"
+              class="settings-input"
+              formControlName="tradeName"
+              placeholder="Ex: Startop Enterprise"
+              [class.invalid]="invalid(companyForm.controls.tradeName)"
+            />
+          </div>
+        </div>
+
+        <!-- Razão Social -->
+        <div class="settings-field-row">
+          <div class="field-meta">
+            <label class="field-label-title" for="legalName">
+              <span>Razão social oficial</span>
+              <span class="req">*</span>
+            </label>
+            <p class="field-description">
+              Como está registrado oficialmente no cartão CNPJ da Receita Federal.
+            </p>
+          </div>
+          <div class="field-control">
+            <input
+              id="legalName"
+              class="settings-input"
+              formControlName="legalName"
+              [class.invalid]="invalid(companyForm.controls.legalName)"
+            />
+            @if (invalid(companyForm.controls.legalName)) {
+              <span class="field-error">Informe a razão social da empresa.</span>
+            }
+          </div>
+        </div>
+
+        <!-- CNPJ / Identificação Fiscal (Business tax ID * da imagem) -->
+        <div class="settings-field-row">
+          <div class="field-meta">
+            <label class="field-label-title" for="cnpj">
+              <span>CNPJ (Identificação Fiscal)</span>
+              <span class="req">*</span>
+            </label>
+            <p class="field-description">
+              Identificador fiscal principal utilizado nos termos de aprovação e auditoria.
+            </p>
+          </div>
+          <div class="field-control">
+            <div class="settings-subgrid">
+              <div class="col-3 sub-field">
+                <label for="cnpj">CNPJ</label>
+                <input
+                  id="cnpj"
+                  class="settings-input"
+                  formControlName="cnpj"
+                  inputmode="numeric"
+                  placeholder="00.000.000/0000-00"
+                  (input)="maskCnpjInput()"
+                  [class.invalid]="invalid(companyForm.controls.cnpj)"
+                />
+                @if (invalid(companyForm.controls.cnpj)) {
+                  <span class="field-error">Informe um CNPJ válido com 14 dígitos.</span>
+                }
+              </div>
+              <div class="col-2 sub-field">
+                <label for="stateRegistration">Inscrição Estadual</label>
+                <input
+                  id="stateRegistration"
+                  class="settings-input"
+                  formControlName="stateRegistration"
+                />
+              </div>
+              <div class="col-1 sub-field">
+                <label for="taxRegime">Regime</label>
+                <select id="taxRegime" class="settings-select" formControlName="taxRegime">
+                  <option value="Lucro Real">Lucro Real</option>
+                  <option value="Lucro Presumido">Lucro Presumido</option>
+                  <option value="Simples Nacional">Simples</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- E-mail & Telefone Corporativo -->
+        <div class="settings-field-row">
+          <div class="field-meta">
+            <label class="field-label-title" for="corporateEmail">
+              <span>E-mail corporativo central</span>
+              <span class="req">*</span>
+            </label>
+            <p class="field-description">
+              Canal oficial da organização para notificações de compliance e faturamento.
+            </p>
+          </div>
+          <div class="field-control">
+            <div class="settings-subgrid">
+              <div class="col-3 sub-field">
+                <label for="corporateEmail">E-mail institucional</label>
+                <input
+                  id="corporateEmail"
+                  type="email"
+                  class="settings-input"
+                  formControlName="corporateEmail"
+                />
+              </div>
+              <div class="col-3 sub-field">
+                <label for="corporatePhone">Telefone / PABX</label>
+                <input
+                  id="corporatePhone"
+                  class="settings-input"
+                  formControlName="corporatePhone"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Endereço Empresarial (Business address * da imagem) -->
+        <div class="settings-field-row" formGroupName="address">
+          <div class="field-meta">
+            <span class="field-label-title">
+              <span>Endereço empresarial</span>
+              <span class="req">*</span>
+            </span>
+            <p class="field-description">
+              Sede fiscal da organização vinculada aos contratos aprovados.
+            </p>
+          </div>
+          <div class="field-control">
+            <div class="settings-subgrid">
+              <div class="col-2 sub-field">
+                <label for="zip">CEP *</label>
+                <input
+                  id="zip"
+                  class="settings-input"
+                  formControlName="zip"
+                  placeholder="00000-000"
+                  (input)="maskCepInput()"
+                  [class.invalid]="invalid(companyForm.controls.address.controls.zip)"
+                />
+              </div>
+              <div class="col-4 sub-field">
+                <label for="street">Logradouro *</label>
+                <input
+                  id="street"
+                  class="settings-input"
+                  formControlName="street"
+                  [class.invalid]="invalid(companyForm.controls.address.controls.street)"
+                />
+              </div>
+              <div class="col-2 sub-field">
+                <label for="number">Número *</label>
+                <input
+                  id="number"
+                  class="settings-input"
+                  formControlName="number"
+                  [class.invalid]="invalid(companyForm.controls.address.controls.number)"
+                />
+              </div>
+              <div class="col-4 sub-field">
+                <label for="complement">Complemento</label>
+                <input
+                  id="complement"
+                  class="settings-input"
+                  formControlName="complement"
+                />
+              </div>
+              <div class="col-2 sub-field">
+                <label for="district">Bairro</label>
+                <input
+                  id="district"
+                  class="settings-input"
+                  formControlName="district"
+                />
+              </div>
+              <div class="col-3 sub-field">
+                <label for="city">Cidade *</label>
+                <input
+                  id="city"
+                  class="settings-input"
+                  formControlName="city"
+                  [class.invalid]="invalid(companyForm.controls.address.controls.city)"
+                />
+              </div>
+              <div class="col-1 sub-field">
+                <label for="state">UF *</label>
+                <input
+                  id="state"
+                  class="settings-input"
+                  formControlName="state"
+                  maxlength="2"
+                  [class.invalid]="invalid(companyForm.controls.address.controls.state)"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="settings-actions-bar">
+        <div class="actions-left">
+          <button type="submit" class="btn-settings primary">
+            <span class="material-symbols-rounded">check</span>
+            <span>Salvar dados da empresa</span>
+          </button>
+          <button type="button" class="btn-settings" (click)="discardCompany()">
+            <span>Descartar</span>
+          </button>
+        </div>
+      </div>
+    </form>
+  }
+
+  <!-- ===================================================================== -->
+  <!-- ABA 2: DEPARTAMENTOS & CENTROS DE CUSTO                               -->
+  <!-- ===================================================================== -->
+  @if (activeTab() === 'departments') {
+    <section class="settings-section-block">
+      <div class="section-header-bar">
+        <div class="section-title-group">
+          <h2>Departamentos & Centros de Custo</h2>
+          <p>
+            Estruture as áreas da empresa que originam solicitações e possuem tetos orçamentários próprios.
+          </p>
+        </div>
+        @if (!isAddingDepartment()) {
+          <button
+            type="button"
+            class="btn-settings primary"
+            (click)="openNewDepartmentForm()"
+          >
+            <span class="material-symbols-rounded">add</span>
+            <span>Registrar Departamento</span>
+          </button>
+        }
+      </div>
+
+      <!-- Painel de Criação / Edição de Departamento -->
+      @if (isAddingDepartment()) {
+        <form
+          class="inline-editor-card"
+          [formGroup]="deptForm"
+          (ngSubmit)="saveDepartment()"
+          novalidate
+        >
+          <div class="editor-card-head">
+            <h3>
+              {{ editingDepartmentId() ? 'Editar Departamento' : 'Novo Departamento & Centro de Custo' }}
+            </h3>
+            <button type="button" class="btn-settings ghost" (click)="cancelDepartmentForm()">
+              Cancelar
+            </button>
+          </div>
+
+          <div class="settings-subgrid">
+            <div class="col-1 sub-field">
+              <label for="deptCode">Sigla *</label>
+              <input
+                id="deptCode"
+                class="settings-input"
+                formControlName="code"
+                placeholder="Ex: FIN"
+                maxlength="5"
+              />
+            </div>
+            <div class="col-3 sub-field">
+              <label for="deptName">Nome do Departamento *</label>
+              <input
+                id="deptName"
+                class="settings-input"
+                formControlName="name"
+                placeholder="Ex: Recursos Humanos & Gente"
+              />
+            </div>
+            <div class="col-2 sub-field">
+              <label for="deptCc">Centro de Custo *</label>
+              <input
+                id="deptCc"
+                class="settings-input"
+                formControlName="costCenter"
+                placeholder="Ex: CC-601"
+              />
+            </div>
+            <div class="col-2 sub-field">
+              <label for="deptBudget">Orçamento Mensal (R$) *</label>
+              <input
+                id="deptBudget"
+                type="number"
+                class="settings-input"
+                formControlName="monthlyBudget"
+              />
+            </div>
+            <div class="col-3 sub-field">
+              <label for="deptManager">Gestor Responsável *</label>
+              <input
+                id="deptManager"
+                class="settings-input"
+                formControlName="managerName"
+                placeholder="Ex: Fernanda Oliveira"
+              />
+            </div>
+            <div class="col-1 sub-field">
+              <span class="sub-field-caption">Cor</span>
+              <div class="mini-color-row">
+                @for (c of deptColors; track c) {
+                  <button
+                    type="button"
+                    class="mini-color-dot"
+                    [style.background-color]="c"
+                    [class.active]="deptForm.controls.color.value === c"
+                    [attr.aria-label]="'Selecionar cor ' + c"
+                    (click)="deptForm.controls.color.setValue(c)"
+                  ></button>
+                }
+              </div>
+            </div>
+          </div>
+
+          @if (deptError()) {
+            <span class="field-error">{{ deptError() }}</span>
+          }
+
+          <div class="editor-card-foot">
+            <button type="button" class="btn-settings" (click)="cancelDepartmentForm()">
+              Cancelar
+            </button>
+            <button type="submit" class="btn-settings primary">
+              <span class="material-symbols-rounded">check</span>
+              <span>{{ editingDepartmentId() ? 'Salvar Alterações' : 'Confirmar Registro' }}</span>
+            </button>
+          </div>
+        </form>
+      }
+
+      <!-- Lista de Departamentos -->
+      <div class="org-items-list">
+        @for (dept of org().departments; track dept.id) {
+          <div class="org-item-row">
+            <div class="item-left">
+              <span
+                class="dept-badge-avatar"
+                [style.background-color]="dept.color + '1a'"
+                [style.color]="dept.color"
+              >
+                {{ dept.code }}
+              </span>
+              <div class="item-info">
+                <div class="item-title-line">
+                  <strong>{{ dept.name }}</strong>
+                  <span class="cc-tag">{{ dept.costCenter }}</span>
+                </div>
+                <span class="item-sub-line">
+                  Gestor: {{ dept.managerName }} · {{ employeesCountByDept(dept.id) }} colaborador(es) vinculado(s)
+                </span>
+              </div>
+            </div>
+
+            <div class="item-right">
+              <div class="budget-col">
+                <span class="budget-caption">Teto Orçamentário Mensal</span>
+                <strong class="budget-val">{{ formatCurrency(dept.monthlyBudget) }}</strong>
+              </div>
+              <div class="row-actions">
+                <button
+                  type="button"
+                  class="btn-settings"
+                  (click)="editDepartment(dept)"
+                >
+                  Editar
+                </button>
+                <button
+                  type="button"
+                  class="btn-settings danger"
+                  (click)="deleteDepartment(dept.id)"
+                >
+                  Remover
+                </button>
+              </div>
+            </div>
+          </div>
+        } @empty {
+          <div class="empty-org-box">
+            Nenhum departamento cadastrado. Clique em "Registrar Departamento" para começar.
+          </div>
+        }
+      </div>
+    </section>
+  }
+
+  <!-- ===================================================================== -->
+  <!-- ABA 3: FUNCIONÁRIOS & COLABORADORES                                   -->
+  <!-- ===================================================================== -->
+  @if (activeTab() === 'employees') {
+    <section class="settings-section-block">
+      <div class="section-header-bar">
+        <div class="section-title-group">
+          <h2>Quadro de Funcionários & Aprovadores</h2>
+          <p>
+            Registre colaboradores, atribua seus departamentos, cargos e limites individuais de alçada.
+          </p>
+        </div>
+        @if (!isEmployeeFormOpen()) {
+          <button
+            type="button"
+            class="btn-settings primary"
+            (click)="openNewEmployeeForm()"
+          >
+            <span class="material-symbols-rounded">person_add</span>
+            <span>Registrar Funcionário</span>
+          </button>
+        }
+      </div>
+
+      <!-- Painel de Registro / Edição de Funcionário -->
+      @if (isEmployeeFormOpen()) {
+        <form
+          class="inline-editor-card"
+          [formGroup]="employeeForm"
+          (ngSubmit)="saveEmployee()"
+          novalidate
+        >
+          <div class="editor-card-head">
+            <h3>
+              {{ editingEmployeeId() ? 'Editar Cadastro do Funcionário' : 'Registrar Novo Funcionário na Empresa' }}
+            </h3>
+            <button type="button" class="btn-settings ghost" (click)="cancelEmployeeForm()">
+              Cancelar
+            </button>
+          </div>
+
+          <div class="settings-subgrid">
+            <div class="col-1 sub-field">
+              <label for="empCode">Matrícula *</label>
+              <input
+                id="empCode"
+                class="settings-input"
+                formControlName="employeeCode"
+              />
+            </div>
+            <div class="col-3 sub-field">
+              <label for="empName">Nome Completo *</label>
+              <input
+                id="empName"
+                class="settings-input"
+                formControlName="fullName"
+                placeholder="Ex: Lucas Gabriel Ferreira"
+              />
+            </div>
+            <div class="col-2 sub-field">
+              <label for="empEmail">E-mail Corporativo *</label>
+              <input
+                id="empEmail"
+                type="email"
+                class="settings-input"
+                formControlName="email"
+                placeholder="nome@empresa.com.br"
+              />
+            </div>
+
+            <div class="col-2 sub-field">
+              <label for="empPhone">Telefone / WhatsApp</label>
+              <input
+                id="empPhone"
+                class="settings-input"
+                formControlName="phone"
+                placeholder="+55 (11) 99999-0000"
+              />
+            </div>
+            <div class="col-2 sub-field">
+              <label for="empJob">Cargo / Função *</label>
+              <input
+                id="empJob"
+                class="settings-input"
+                formControlName="jobTitle"
+                placeholder="Ex: Coordenador de Compras"
+              />
+            </div>
+            <div class="col-2 sub-field">
+              <label for="empDept">Departamento *</label>
+              <select id="empDept" class="settings-select" formControlName="departmentId">
+                @for (d of org().departments; track d.id) {
+                  <option [value]="d.id">{{ d.name }} ({{ d.costCenter }})</option>
+                }
+              </select>
+            </div>
+
+            <div class="col-2 sub-field">
+              <label for="empRole">Papel de Governança (RBAC) *</label>
+              <select id="empRole" class="settings-select" formControlName="role">
+                @for (r of employeeRoles; track r.value) {
+                  <option [value]="r.value">{{ r.label }}</option>
+                }
+              </select>
+            </div>
+            <div class="col-2 sub-field">
+              <label for="empLimit">Teto de Alçada Individual (R$) *</label>
+              <input
+                id="empLimit"
+                type="number"
+                class="settings-input"
+                formControlName="approvalLimit"
+              />
+            </div>
+            <div class="col-2 sub-field">
+              <label for="empStatus">Status do Vínculo *</label>
+              <select id="empStatus" class="settings-select" formControlName="status">
+                <option value="ATIVO">Ativo</option>
+                <option value="FERIAS">Em Férias / Ausente</option>
+                <option value="INATIVO">Inativo / Bloqueado</option>
+              </select>
+            </div>
+          </div>
+
+          @if (employeeError()) {
+            <span class="field-error">{{ employeeError() }}</span>
+          }
+
+          <div class="editor-card-foot">
+            <button type="button" class="btn-settings" (click)="cancelEmployeeForm()">
+              Cancelar
+            </button>
+            <button type="submit" class="btn-settings primary">
+              <span class="material-symbols-rounded">check</span>
+              <span>{{ editingEmployeeId() ? 'Salvar Alterações' : 'Registrar Funcionário' }}</span>
+            </button>
+          </div>
+        </form>
+      }
+
+      <!-- Barra de Busca e Filtro por Departamento -->
+      <div class="employees-toolbar">
+        <div class="search-emp-box">
+          <span class="material-symbols-rounded">search</span>
+          <input
+            type="text"
+            placeholder="Buscar funcionário por nome, e-mail, cargo ou matrícula..."
+            [ngModel]="employeeSearch()"
+            (ngModelChange)="employeeSearch.set($event)"
+          />
+        </div>
+
+        <select
+          class="settings-select dept-filter-select"
+          [ngModel]="employeeDeptFilter()"
+          (ngModelChange)="employeeDeptFilter.set($event)"
+          aria-label="Filtrar por departamento"
+        >
+          <option value="TODOS">Todos os departamentos ({{ org().employees.length }})</option>
+          @for (d of org().departments; track d.id) {
+            <option [value]="d.id">{{ d.name }}</option>
+          }
+        </select>
+      </div>
+
+      <!-- Lista de Funcionários -->
+      <div class="org-items-list">
+        @for (emp of filteredEmployees(); track emp.id) {
+          <div class="org-item-row employee-row">
+            <div class="item-left">
+              <div class="emp-avatar-circle">
+                {{ employeeInitials(emp.fullName) }}
+              </div>
+              <div class="item-info">
+                <div class="item-title-line">
+                  <strong>{{ emp.fullName }}</strong>
+                  <span class="cc-tag">{{ emp.employeeCode }}</span>
+                  <span
+                    class="settings-pill"
+                    [class.success]="emp.status === 'ATIVO'"
+                    [class.warning]="emp.status === 'FERIAS'"
+                    [class.neutral]="emp.status === 'INATIVO'"
+                  >
+                    {{ emp.status }}
+                  </span>
+                </div>
+                <span class="item-sub-line">
+                  {{ emp.jobTitle }} · <strong>{{ emp.departmentName }}</strong> · {{ emp.email }}
+                </span>
+              </div>
+            </div>
+
+            <div class="item-right">
+              <div class="budget-col">
+                <span class="budget-caption">Papel: {{ emp.role }}</span>
+                <strong class="budget-val">
+                  {{ emp.approvalLimit > 0 ? 'Alçada: ' + formatCurrency(emp.approvalLimit) : 'Sem alçada financeira' }}
+                </strong>
+              </div>
+              <div class="row-actions">
+                <button
+                  type="button"
+                  class="btn-settings"
+                  (click)="editEmployee(emp)"
+                >
+                  Editar
+                </button>
+                <button
+                  type="button"
+                  class="btn-settings danger"
+                  (click)="deleteEmployee(emp.id)"
+                >
+                  Remover
+                </button>
+              </div>
+            </div>
+          </div>
+        } @empty {
+          <div class="empty-org-box">
+            Nenhum funcionário encontrado para o filtro selecionado.
+          </div>
+        }
+      </div>
+    </section>
+  }
+
+  <!-- ===================================================================== -->
+  <!-- ABA 4: POLÍTICAS & GOVERNANÇA DO PROJETO                              -->
+  <!-- ===================================================================== -->
+  @if (activeTab() === 'policies') {
+    <form [formGroup]="policiesForm" (ngSubmit)="savePolicies()" novalidate>
+      <section class="settings-section-block">
+        <div class="section-header-bar">
+          <div class="section-title-group">
+            <h2>Políticas Globais de Alçada & Compliance</h2>
+            <p>
+              Regras estruturais aplicadas automaticamente a todos os fluxos e requisições da empresa.
+            </p>
+          </div>
+        </div>
+
+        <!-- Piso de Aprovação Automática -->
+        <div class="settings-field-row">
+          <div class="field-meta">
+            <label class="field-label-title" for="autoApproveBelow">
+              <span>Piso de aprovação automática (Fast-Track)</span>
+              <span class="req">*</span>
+            </label>
+            <p class="field-description">
+              Requisições de baixo valor abaixo deste limite são aprovadas automaticamente sem fila humana.
+            </p>
+          </div>
+          <div class="field-control">
+            <div class="settings-subgrid">
+              <div class="col-2 sub-field">
+                <label for="defaultCurrency">Moeda Padrão</label>
+                <select id="defaultCurrency" class="settings-select" formControlName="defaultCurrency">
+                  <option value="BRL">Real Brasileiro (R$ · BRL)</option>
+                  <option value="USD">Dólar Americano ($ · USD)</option>
+                  <option value="EUR">Euro (€ · EUR)</option>
+                </select>
+              </div>
+              <div class="col-2 sub-field">
+                <label for="autoApproveBelow">Valor Limite (R$)</label>
+                <input
+                  id="autoApproveBelow"
+                  type="number"
+                  class="settings-input"
+                  formControlName="autoApproveBelow"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SLA Padrão e Escalonamento -->
+        <div class="settings-field-row">
+          <div class="field-meta">
+            <label class="field-label-title" for="defaultSlaHours">
+              <span>SLA padrão e escalonamento hierárquico</span>
+              <span class="req">*</span>
+            </label>
+            <p class="field-description">
+              Prazo limite padrão por etapa antes do sistema redirecionar ao aprovador substituto ou superior.
+            </p>
+          </div>
+          <div class="field-control">
+            <div class="settings-subgrid">
+              <div class="col-2 sub-field">
+                <label for="defaultSlaHours">Prazo SLA (em horas)</label>
+                <input
+                  id="defaultSlaHours"
+                  type="number"
+                  class="settings-input"
+                  formControlName="defaultSlaHours"
+                />
+              </div>
+              <div class="col-4 sub-field" style="justify-content: flex-end; padding-bottom: 6px">
+                <label class="settings-switch">
+                  <input type="checkbox" formControlName="autoEscalateOnSla" />
+                  <span class="switch-track"></span>
+                  <span class="switch-label">
+                    Escalonar automaticamente ao nível superior quando o SLA vencer
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Segregação de Funções (SoD) -->
+        <div class="settings-field-row">
+          <div class="field-meta">
+            <span class="field-label-title">
+              <span>Segregação de Funções Estrita (SoD)</span>
+              <span class="req">*</span>
+            </span>
+            <p class="field-description">
+              Bloqueia que o colaborador que criou a requisição delibere como aprovador no mesmo processo.
+            </p>
+          </div>
+          <div class="field-control">
+            <label class="settings-switch">
+              <input type="checkbox" formControlName="strictSod" />
+              <span class="switch-track"></span>
+              <span class="switch-label">
+                Impedir autoaprovação e conflito de papéis em todas as esteiras
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Assinatura Criptográfica e Dupla Aprovação -->
+        <div class="settings-field-row">
+          <div class="field-meta">
+            <label class="field-label-title" for="dualApprovalThreshold">
+              <span>Quórum duplo & Assinatura Criptográfica</span>
+              <span class="req">*</span>
+            </label>
+            <p class="field-description">
+              Define o teto a partir do qual são exigidas duas assinaturas independentes (4-Eyes Principle).
+            </p>
+          </div>
+          <div class="field-control">
+            <div class="settings-subgrid">
+              <div class="col-3 sub-field">
+                <label for="dualApprovalThreshold">Exigir dupla aprovação acima de (R$)</label>
+                <input
+                  id="dualApprovalThreshold"
+                  type="number"
+                  class="settings-input"
+                  formControlName="dualApprovalThreshold"
+                />
+              </div>
+              <div class="col-3 sub-field" style="justify-content: flex-end; padding-bottom: 6px">
+                <label class="settings-switch">
+                  <input type="checkbox" formControlName="requireCryptographicSignature" />
+                  <span class="switch-track"></span>
+                  <span class="switch-label">Exigir rubrica + Hash SHA-256</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cotações Mínimas e Retenção de Auditoria -->
+        <div class="settings-field-row">
+          <div class="field-meta">
+            <label class="field-label-title" for="minQuotesCount">
+              <span>Política de cotações e guarda fiscal</span>
+            </label>
+            <p class="field-description">
+              Exigência de anexos comparativos de fornecedores e tempo de retenção da trilha criptográfica.
+            </p>
+          </div>
+          <div class="field-control">
+            <div class="settings-subgrid">
+              <div class="col-2 sub-field">
+                <label for="minQuotesCount">Mínimo de cotações</label>
+                <input
+                  id="minQuotesCount"
+                  type="number"
+                  class="settings-input"
+                  formControlName="minQuotesCount"
+                />
+              </div>
+              <div class="col-2 sub-field">
+                <label for="minQuotesThreshold">Para compras acima de (R$)</label>
+                <input
+                  id="minQuotesThreshold"
+                  type="number"
+                  class="settings-input"
+                  formControlName="minQuotesThreshold"
+                />
+              </div>
+              <div class="col-2 sub-field">
+                <label for="auditRetentionYears">Retenção Auditoria (Anos)</label>
+                <input
+                  id="auditRetentionYears"
+                  type="number"
+                  class="settings-input"
+                  formControlName="auditRetentionYears"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="settings-actions-bar">
+        <div class="actions-left">
+          <button type="submit" class="btn-settings primary">
+            <span class="material-symbols-rounded">verified_user</span>
+            <span>Salvar políticas do projeto</span>
+          </button>
+        </div>
+      </div>
+    </form>
+  }
+</div>

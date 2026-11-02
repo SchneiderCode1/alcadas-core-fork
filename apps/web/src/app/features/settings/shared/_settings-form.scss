@@ -1,0 +1,522 @@
+// =============================================================================
+// DESIGN SYSTEM DE CONFIGURAÇÕES & PERFIL (ESTILO SAAS MODERNO / LINEAR / ATTIO)
+// =============================================================================
+
+:host {
+  display: block;
+  width: 100%;
+  color: #0f172a;
+}
+
+.settings-page-wrapper {
+  max-width: 960px;
+  width: 100%;
+}
+
+// 1. Cabeçalho de Identidade da Página (Avatar quadrado arredondado + Título + Subtítulo)
+.settings-identity-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+
+  .identity-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .identity-avatar-box {
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #0f172a 0%, #334155 100%);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    font-weight: 700;
+    border: 2px solid #ffffff;
+    box-shadow:
+      0 4px 12px rgba(15, 23, 42, 0.08),
+      0 0 0 1px #e2e8f0;
+    flex-shrink: 0;
+    overflow: hidden;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .material-symbols-rounded {
+      font-size: 26px;
+    }
+  }
+
+  .identity-titles {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+
+    h1 {
+      margin: 0;
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+
+    p {
+      margin: 0;
+      font-size: 0.875rem;
+      color: #64748b;
+    }
+  }
+
+  .identity-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+  }
+}
+
+// 2. Barra de Abas Horizontais com Underline (Details | Socials | Projects...)
+.settings-tabs-nav {
+  display: flex;
+  align-items: center;
+  gap: 1.75rem;
+  border-bottom: 1px solid #eef2f6;
+  margin-bottom: 2rem;
+  overflow-x: auto;
+
+  &::-webkit-scrollbar {
+    height: 0;
+  }
+
+  .settings-tab-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.75rem 0.15rem;
+    border: none;
+    background: transparent;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #64748b;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+
+    .tab-icon {
+      font-size: 17px;
+      color: #94a3b8;
+    }
+
+    .tab-badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.1rem 0.45rem;
+      border-radius: 999px;
+      background: #f1f5f9;
+      color: #475569;
+    }
+
+    &:hover {
+      color: #0f172a;
+
+      .tab-icon {
+        color: #475569;
+      }
+    }
+
+    &.active {
+      color: #0f172a;
+      font-weight: 600;
+      border-bottom-color: #0f172a;
+
+      .tab-icon {
+        color: #0f172a;
+      }
+
+      .tab-badge {
+        background: #0f172a;
+        color: #ffffff;
+      }
+    }
+  }
+}
+
+// 3. Títulos de Seção
+.settings-section-block {
+  margin-bottom: 2.25rem;
+
+  .section-header-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px dotted #cbd5e1;
+
+    .section-title-group {
+      h2 {
+        margin: 0;
+        font-size: 1.125rem;
+        font-weight: 700;
+        color: #0f172a;
+        letter-spacing: -0.015em;
+      }
+
+      p {
+        margin: 0.2rem 0 0;
+        font-size: 0.8125rem;
+        color: #64748b;
+      }
+    }
+  }
+}
+
+// 4. Linhas de Formulário com Divisor Pontilhado (Dotted Rows da Imagem)
+.settings-field-row {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 0.85rem 2.5rem;
+  padding: 1.35rem 0;
+  border-bottom: 1px dotted #cbd5e1;
+  align-items: start;
+
+  &.stacked {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .field-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+
+    .field-label-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #0f172a;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+
+      .req {
+        color: #e11d48;
+        font-weight: 700;
+      }
+    }
+
+    .field-description {
+      margin: 0;
+      font-size: 0.8125rem;
+      color: #64748b;
+      line-height: 1.45;
+    }
+  }
+
+  .field-control {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    min-width: 0;
+  }
+}
+
+// 5. Inputs, Selects e Textareas Padronizados
+.settings-input,
+.settings-select,
+.settings-textarea {
+  width: 100%;
+  padding: 0.58rem 0.85rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 0.875rem;
+  font-family: inherit;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+
+  &::placeholder {
+    color: #94a3b8;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: #0f172a;
+    box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.08);
+  }
+
+  &:disabled,
+  &[readonly] {
+    background: #f8fafc;
+    color: #64748b;
+    cursor: not-allowed;
+  }
+
+  &.invalid {
+    border-color: #ef4444;
+    background: #fef2f2;
+  }
+}
+
+.settings-textarea {
+  min-height: 88px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.field-error {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #dc2626;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+// Grid auxiliar de endereço / sub-campos
+.settings-subgrid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.85rem;
+
+  .col-1 { grid-column: span 1; }
+  .col-2 { grid-column: span 2; }
+  .col-3 { grid-column: span 3; }
+  .col-4 { grid-column: span 4; }
+  .col-6 { grid-column: span 6; }
+
+  .sub-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+
+    label,
+    .sub-field-caption {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #475569;
+    }
+  }
+}
+
+// 6. Botões do Design de Configurações
+.btn-settings {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.52rem 1rem;
+  border-radius: 9px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+
+  .material-symbols-rounded {
+    font-size: 17px;
+  }
+
+  &:hover:not(:disabled) {
+    background: #f8fafc;
+    border-color: #94a3b8;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &.primary {
+    background: #0f172a;
+    border-color: #0f172a;
+    color: #ffffff;
+
+    &:hover:not(:disabled) {
+      background: #1e293b;
+      border-color: #1e293b;
+    }
+  }
+
+  &.brand {
+    background: #644ef3;
+    border-color: #644ef3;
+    color: #ffffff;
+
+    &:hover:not(:disabled) {
+      background: #533cd9;
+      border-color: #533cd9;
+    }
+  }
+
+  &.danger {
+    border-color: #fecaca;
+    background: #fef2f2;
+    color: #dc2626;
+
+    &:hover:not(:disabled) {
+      background: #fee2e2;
+      border-color: #fca5a5;
+    }
+  }
+
+  &.ghost {
+    border-color: transparent;
+    background: transparent;
+    color: #64748b;
+
+    &:hover:not(:disabled) {
+      background: #f1f5f9;
+      color: #0f172a;
+    }
+  }
+}
+
+// 7. Rodapé de Ações e Feedback
+.settings-actions-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-top: 1.5rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+
+  .actions-left {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+  }
+
+  .save-feedback {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.85rem;
+    border-radius: 999px;
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    color: #047857;
+    font-size: 0.8125rem;
+    font-weight: 600;
+
+    .material-symbols-rounded {
+      font-size: 17px;
+    }
+  }
+}
+
+// 8. Toggle Switch Moderno
+.settings-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  cursor: pointer;
+  user-select: none;
+
+  input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .switch-track {
+    width: 40px;
+    height: 22px;
+    background: #cbd5e1;
+    border-radius: 999px;
+    position: relative;
+    transition: background 0.2s ease;
+    flex-shrink: 0;
+
+    &::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+      transition: transform 0.2s ease;
+    }
+  }
+
+  input:checked + .switch-track {
+    background: #0f172a;
+
+    &::after {
+      transform: translateX(18px);
+    }
+  }
+
+  .switch-label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #334155;
+  }
+}
+
+// 9. Badges e Pílulas
+.settings-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #f1f5f9;
+  color: #334155;
+
+  &.success {
+    background: #dcfce7;
+    color: #15803d;
+  }
+
+  &.primary {
+    background: #ede9fe;
+    color: #644ef3;
+  }
+
+  &.warning {
+    background: #fef3c7;
+    color: #b45309;
+  }
+
+  &.neutral {
+    background: #f1f5f9;
+    color: #475569;
+  }
+}
+
+@media (max-width: 768px) {
+  .settings-field-row {
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+  }
+
+  .settings-subgrid > * {
+    grid-column: span 6 !important;
+  }
+}

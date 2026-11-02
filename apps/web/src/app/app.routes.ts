@@ -30,7 +30,7 @@ export const appRoutes: Route[] = [
     children: [
       {
         path: 'configuracoes',
-        loadChildren: () => import('./settings/settings.routes').then((m) => m.SETTINGS_ROUTES),
+        loadChildren: () => import('./features/settings/settings.routes').then((m) => m.SETTINGS_ROUTES),
       },
       {
         path: 'dashboard',
