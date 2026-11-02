@@ -69,4 +69,12 @@ describe('DigitalSignatureModalComponent', () => {
     component.toggleSignMode();
     expect(component.signMode()).toBe('draw');
   });
+
+  it('usa o nome do aprovador logado como rubrica digitada ao abrir', () => {
+    fixture.componentRef.setInput('signatario', 'Carlos Gerente');
+    fixture.componentRef.setInput('isOpen', true);
+    fixture.detectChanges();
+
+    expect(component.typedSignature()).toBe('Carlos Gerente');
+  });
 });

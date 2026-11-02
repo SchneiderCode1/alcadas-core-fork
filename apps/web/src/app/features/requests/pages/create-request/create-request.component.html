@@ -5,18 +5,13 @@
   searchPlaceholder="Buscar diretrizes de compra..."
   contextIcon="post_add"
   contextTitle="Nova Solicitação de Compra"
-  contextSubtitle="Preencha os dados e anexe documentos para envio ao fluxo de alçadas"
+  contextSubtitle="Preencha os dados para enviar a solicitação ao fluxo de alçadas"
   [showTier2]="false"
 >
   <div header-actions class="header-actions-group">
     <button type="button" class="btn-header-outline" (click)="goBack()" title="Voltar para Solicitações">
       <span class="material-symbols-rounded">arrow_back</span>
       <span>Voltar</span>
-    </button>
-
-    <button type="button" class="btn-header-outline" (click)="saveDraft()" title="Salvar Rascunho">
-      <span class="material-symbols-rounded">save_as</span>
-      <span>Salvar Rascunho</span>
     </button>
 
     <button
@@ -44,6 +39,13 @@
     <!-- COLUNA PRINCIPAL: CAMPOS DO FORMULÁRIO -->
     <div class="form-main-column">
 
+      @if (formErrors()['geral']) {
+        <div class="form-error-banner" role="alert">
+          <span class="material-symbols-rounded">error</span>
+          <span>{{ formErrors()['geral'] }}</span>
+        </div>
+      }
+
       <!-- Card 1: Identificação e Dados Principais -->
       <section class="form-card">
         <header class="card-header">
@@ -52,33 +54,11 @@
           </div>
           <div class="header-text">
             <h2 class="card-title">Identificação da Despesa</h2>
-            <p class="card-subtitle">Informe o título, centro de custo e a categoria de compras correspondente</p>
+            <p class="card-subtitle">Informe o centro de custo e a categoria de compras correspondente</p>
           </div>
         </header>
 
         <div class="card-body">
-          <!-- Campo: Título -->
-          <div class="form-group">
-            <label for="tituloInput" class="form-label">
-              Título da Solicitação <span class="required">*</span>
-            </label>
-            <input
-              id="tituloInput"
-              type="text"
-              class="form-control"
-              placeholder="Ex: Aquisição de licenças Figma Enterprise para equipe de design"
-              [ngModel]="formTitulo()"
-              (ngModelChange)="formTitulo.set($event)"
-              name="titulo"
-              [class.has-error]="formErrors()['titulo']"
-            />
-            @if (formErrors()['titulo']) {
-              <span class="error-msg">{{ formErrors()['titulo'] }}</span>
-            } @else {
-              <span class="field-hint">Seja claro e objetivo para facilitar a identificação pelos aprovadores.</span>
-            }
-          </div>
-
           <!-- Linha Dupla: Centro de Custo + Categoria -->
           <div class="form-row-2">
             <div class="form-group">
@@ -91,11 +71,18 @@
                 [ngModel]="formCentroCustoId()"
                 (ngModelChange)="formCentroCustoId.set($event)"
                 name="centroCustoId"
+                [class.has-error]="formErrors()['centroCusto']"
               >
-                @for (cc of requestsService.costCenters; track cc.id) {
-                  <option [value]="cc.id">{{ cc.code }} - {{ cc.nome }} ({{ cc.departamento }})</option>
+                <option value="" disabled>Selecione o centro de custo</option>
+                @for (cc of requestsService.costCenters(); track cc.id) {
+                  <option [value]="cc.id">{{ cc.code }} - {{ cc.nome }}</option>
                 }
               </select>
+              @if (formErrors()['centroCusto']) {
+                <span class="error-msg">{{ formErrors()['centroCusto'] }}</span>
+              } @else if (requestsService.loadState() === 'pronto' && requestsService.costCenters().length === 0) {
+                <span class="field-hint">Nenhum centro de custo cadastrado para a sua empresa.</span>
+              }
             </div>
 
             <div class="form-group">
@@ -108,63 +95,18 @@
                 [ngModel]="formCategoria()"
                 (ngModelChange)="formCategoria.set($event)"
                 name="categoria"
+                [class.has-error]="formErrors()['categoria']"
               >
                 @for (cat of requestsService.categories; track cat.id) {
                   <option [value]="cat.id">{{ cat.label }}</option>
                 }
               </select>
+              @if (formErrors()['categoria']) {
+                <span class="error-msg">{{ formErrors()['categoria'] }}</span>
+              }
             </div>
           </div>
 
-          <!-- Nível de Prioridade / Urgência -->
-          <div class="form-group">
-            <span class="form-label">Prioridade da Demanda</span>
-            <div class="priority-selector" role="radiogroup" aria-label="Prioridade da Solicitação">
-              <button
-                type="button"
-                class="priority-card"
-                [class.active]="formPrioridade() === 'BAIXA'"
-                (click)="setPriority('BAIXA')"
-              >
-                <span class="dot dot-low"></span>
-                <span class="p-title">Baixa</span>
-                <span class="p-desc">Planejamento regular</span>
-              </button>
-
-              <button
-                type="button"
-                class="priority-card"
-                [class.active]="formPrioridade() === 'MEDIA'"
-                (click)="setPriority('MEDIA')"
-              >
-                <span class="dot dot-med"></span>
-                <span class="p-title">Média</span>
-                <span class="p-desc">Rotina operacional</span>
-              </button>
-
-              <button
-                type="button"
-                class="priority-card"
-                [class.active]="formPrioridade() === 'ALTA'"
-                (click)="setPriority('ALTA')"
-              >
-                <span class="dot dot-high"></span>
-                <span class="p-title">Alta</span>
-                <span class="p-desc">Impacto de entrega</span>
-              </button>
-
-              <button
-                type="button"
-                class="priority-card"
-                [class.active]="formPrioridade() === 'CRITICA'"
-                (click)="setPriority('CRITICA')"
-              >
-                <span class="dot dot-crit"></span>
-                <span class="p-title">Crítica</span>
-                <span class="p-desc">Risco de interrupção</span>
-              </button>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -176,7 +118,7 @@
           </div>
           <div class="header-text">
             <h2 class="card-title">Justificativa de Negócio</h2>
-            <p class="card-subtitle">Fundamentação exigida pelo comitê de governança e auditoria da organização</p>
+            <p class="card-subtitle">Acima do limite base da categoria, a justificativa precisa de ao menos {{ justificativaMinima }} caracteres</p>
           </div>
         </header>
 
@@ -186,9 +128,11 @@
               <label for="justificativaInput" class="form-label">
                 Motivo e Benefícios da Despesa <span class="required">*</span>
               </label>
-              <span class="char-counter" [class.is-valid]="formJustificativa().length >= 30">
-                {{ formJustificativa().length }} / min 30 caracteres
-              </span>
+              @if (exigeJustificativaLonga()) {
+                <span class="char-counter" [class.is-valid]="formJustificativa().trim().length >= justificativaMinima">
+                  {{ formJustificativa().trim().length }} / mín. {{ justificativaMinima }} caracteres
+                </span>
+              }
             </div>
             <textarea
               id="justificativaInput"
@@ -212,65 +156,6 @@
         </div>
       </section>
 
-      <!-- Card 3: Documentação e Orçamentos -->
-      <section class="form-card">
-        <header class="card-header">
-          <div class="header-icon-wrap icon-success">
-            <span class="material-symbols-rounded">attach_file</span>
-          </div>
-          <div class="header-text">
-            <h2 class="card-title">Cotações & Anexos Comprobatórios</h2>
-            <p class="card-subtitle">Anexe no mínimo uma proposta ou comparativo comercial para aprovação</p>
-          </div>
-        </header>
-
-        <div class="card-body">
-          <div
-            class="dropzone-area"
-            (click)="triggerFileInput()"
-            (keydown.enter)="triggerFileInput()"
-            tabindex="0"
-            role="button"
-            aria-label="Selecionar arquivos para anexo"
-          >
-            <div class="dropzone-icon-circle">
-              <span class="material-symbols-rounded dropzone-icon">cloud_upload</span>
-            </div>
-            <div class="dropzone-text">
-              <strong>Clique para adicionar arquivos de cotação</strong>
-              <span>Suporta propostas comerciais, orçamentos e contratos em formato .PDF ou .DOCX (até 15MB)</span>
-            </div>
-          </div>
-
-          <!-- Lista de Arquivos Anexados -->
-          @if (formAnexos().length > 0) {
-            <div class="attachments-list">
-              <h3 class="attachments-list-title">Documentos Anexados ({{ formAnexos().length }})</h3>
-              @for (att of formAnexos(); track $index) {
-                <div class="attachment-item">
-                  <div class="attachment-left">
-                    <span class="material-symbols-rounded file-icon">picture_as_pdf</span>
-                    <div class="attachment-details">
-                      <strong class="file-name">{{ att.nome }}</strong>
-                      <span class="file-size">{{ att.tamanho }} · Verificado</span>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    class="btn-remove-attachment"
-                    (click)="removeAttachment($index)"
-                    title="Remover anexo"
-                    aria-label="Remover arquivo"
-                  >
-                    <span class="material-symbols-rounded">delete</span>
-                  </button>
-                </div>
-              }
-            </div>
-          }
-        </div>
-      </section>
-
       <!-- Rodapé de Ações do Formulário -->
       <div class="form-action-bar">
         <button type="button" class="btn-cancel" (click)="goBack()">
@@ -278,11 +163,6 @@
         </button>
 
         <div class="right-buttons">
-          <button type="button" class="btn-save-draft" (click)="saveDraft()">
-            <span class="material-symbols-rounded">save_as</span>
-            <span>Salvar Rascunho</span>
-          </button>
-
           <button
             type="button"
             class="btn-submit"
@@ -335,7 +215,7 @@
           }
         </div>
 
-        @if (formValor()) {
+        @if ((formValor() ?? 0) > 0) {
           <div class="value-highlight-display">
             <span class="display-label">Impacto no Centro de Custo:</span>
             <strong class="display-amount">{{ formValor() | currency:'BRL':'symbol':'1.2-2' }}</strong>
@@ -357,7 +237,7 @@
         </div>
 
         <p class="workflow-info-text">
-          Conforme as regras de governança, o valor informado requer a seguinte trilha sequencial:
+          Calculada com os tetos de alçada da sua empresa para o valor informado:
         </p>
 
         <!-- Stepper Sequencial de Etapas -->
@@ -374,7 +254,9 @@
               <div class="step-details">
                 <strong class="step-title">{{ step.nome }}</strong>
                 <span class="step-role">{{ step.papel }}</span>
-                <span class="step-responsavel">{{ step.responsavelNome }}</span>
+                @if (step.responsavelNome) {
+                  <span class="step-responsavel">{{ step.responsavelNome }}</span>
+                }
               </div>
             </div>
           }
@@ -390,13 +272,6 @@
 
         <ul class="governance-rules-list">
           <li class="rule-item">
-            <span class="material-symbols-rounded rule-icon">lock_clock</span>
-            <div>
-              <strong>Tempo Médio de Resposta</strong>
-              <p>Fluxos deste centro de custo são deliberados em até 2 dias úteis.</p>
-            </div>
-          </li>
-          <li class="rule-item">
             <span class="material-symbols-rounded rule-icon">verified_user</span>
             <div>
               <strong>Segregação de Funções (SoD)</strong>
@@ -407,7 +282,7 @@
             <span class="material-symbols-rounded rule-icon">link</span>
             <div>
               <strong>Imutabilidade SHA-256</strong>
-              <p>Geração de hash de integridade logo após a submissão.</p>
+              <p>A criação e cada decisão viram um elo encadeado na trilha de auditoria.</p>
             </div>
           </li>
         </ul>

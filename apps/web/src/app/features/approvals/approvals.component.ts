@@ -1,275 +1,189 @@
-import { Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import {
-  PageHeaderComponent,
-  PageHeaderTab,
-} from '../../shared/components/page-header/page-header.component';
+import { AuthService } from '../../core/auth/auth.service';
+import { podeDecidir } from '../../core/auth/roles';
+import { mensagemDeErroDaApi } from '../../core/http/api-error';
+import { PageHeaderComponent, PageHeaderTab } from '../../shared/components/page-header/page-header.component';
 import { RightDrawerComponent } from '../../shared/components/right-drawer/right-drawer.component';
+import {
+  ApprovalStep,
+  DecisionAction,
+  LoadState,
+  MOTIVO_MINIMO_DA_DECISAO,
+  RequestItem,
+  RequestStatus,
+} from '../requests/requests.models';
+import { RequestsService } from '../requests/services/requests.service';
 import {
   DigitalSignatureModalComponent,
   SignatureConfirmation,
 } from './components/digital-signature-modal/digital-signature-modal.component';
-import { RequestsService } from '../requests/services/requests.service';
-import { RequestItem, RequestPriority, RequestStatus } from '../requests/requests.models';
 
 export type ApprovalsTab = 'pendentes' | 'ajustes' | 'aprovadas' | 'todas';
+export type ApprovalsSort = 'recentes' | 'maior_valor' | 'menor_valor';
+type ToastType = 'success' | 'warning' | 'error' | 'info';
 
+const STATUS_POR_ABA: Record<Exclude<ApprovalsTab, 'todas'>, RequestStatus> = {
+  pendentes: 'PENDENTE',
+  ajustes: 'EM_AJUSTE',
+  aprovadas: 'APROVADA',
+};
+
+const DURACAO_DO_TOAST_MS = 4500;
+
+/**
+ * Central de deliberação do aprovador (US-03), ligada à API: aprova (T02), rejeita (T03)
+ * ou pede ajuste (T04) com a `versao` lida (CA-05.1) e mostra a trilha SHA-256 (US-07).
+ * A SoD (CA-04.1) também é aplicada pela API; aqui ela só esconde ações que seriam recusadas.
+ */
 @Component({
   selector: 'app-approvals',
   standalone: true,
-  imports: [
-    CommonModule,
-    FormsModule,
-    PageHeaderComponent,
-    RightDrawerComponent,
-    DigitalSignatureModalComponent,
-  ],
+  imports: [CommonModule, FormsModule, PageHeaderComponent, RightDrawerComponent, DigitalSignatureModalComponent],
   templateUrl: './approvals.component.html',
   styleUrl: './approvals.component.scss',
 })
-export class ApprovalsComponent {
+export class ApprovalsComponent implements OnInit {
   readonly requestsService = inject(RequestsService);
+  private readonly authService = inject(AuthService);
 
-  // Filtros e Navegação
+  readonly motivoMinimo = MOTIVO_MINIMO_DA_DECISAO;
+
+  // Filtros e navegação
   readonly currentTab = signal<ApprovalsTab>('pendentes');
   readonly searchQuery = signal<string>('');
   readonly selectedDepartment = signal<string>('TODOS');
   readonly selectedCategory = signal<string>('TODAS');
   readonly selectedCostCenter = signal<string>('TODOS');
-  readonly selectedPriority = signal<string>('TODAS');
-  readonly sortBy = signal<'recentes' | 'maior_valor' | 'menor_valor' | 'prioridade'>('recentes');
+  readonly sortBy = signal<ApprovalsSort>('recentes');
   readonly showKpis = signal<boolean>(true);
 
-  // Seleção e Paginação
+  // Seleção e paginação
   readonly selectedIds = signal<Set<string>>(new Set());
   readonly currentPage = signal<number>(1);
   readonly pageSize = signal<number>(10);
 
-  // Inspeção no Drawer
+  // Detalhe e trilha
   readonly selectedRequest = signal<RequestItem | null>(null);
   readonly isDetailDrawerOpen = signal<boolean>(false);
+  readonly trailSteps = signal<ApprovalStep[]>([]);
+  readonly trailState = signal<LoadState>('carregando');
 
-  // Modal de Assinatura Digital
+  // Assinatura (aprovação individual ou em lote)
   readonly signingRequest = signal<RequestItem | null>(null);
   readonly isSignModalOpen = signal<boolean>(false);
   readonly isBatchSignMode = signal<boolean>(false);
 
-  // Modal de Validação Técnica
-  readonly validatingRequest = signal<RequestItem | null>(null);
-  readonly validationNote = signal<string>(
-    'Conformidade técnica e orçamentária atestada em conformidade com o regimento interno de governança.'
-  );
-
-  // Modal de Ajuste / Revisão
+  // Ajuste e rejeição
   readonly adjustingRequest = signal<RequestItem | null>(null);
   readonly adjustmentReason = signal<string>('');
-
-  // Modal de Rejeição / Negativa
   readonly rejectingRequest = signal<RequestItem | null>(null);
   readonly rejectionReason = signal<string>('');
 
-  // Notificações Toast
-  readonly toast = signal<{
-    title: string;
-    message: string;
-    type: 'success' | 'warning' | 'error' | 'info';
-  } | null>(null);
+  readonly isDeciding = signal<boolean>(false);
+  readonly toast = signal<{ title: string; message: string; type: ToastType } | null>(null);
+  private toastTimer?: ReturnType<typeof setTimeout>;
 
-  // Alçada do gestor autenticado
-  readonly authorizedLimit = 50000;
-
-  // Abas do PageHeader
-  readonly headerTabs = computed<PageHeaderTab[]>(() => {
-    return [
-      {
-        id: 'pendentes',
-        label: 'Para Deliberar',
-        icon: 'hourglass_top',
-        badge: this.pendingCount(),
-        badgeVariant: 'warning',
-      },
-      {
-        id: 'ajustes',
-        label: 'Em Revisão',
-        icon: 'edit_note',
-        badge: this.adjustmentCount(),
-        badgeVariant: this.adjustmentCount() > 0 ? 'warning' : 'neutral',
-      },
-      {
-        id: 'aprovadas',
-        label: 'Aprovadas',
-        icon: 'verified',
-        badge: this.approvedCount(),
-        badgeVariant: 'success',
-      },
-      {
-        id: 'todas',
-        label: 'Todas',
-        icon: 'list_alt',
-        badge: this.requestsService.requests().length,
-        badgeVariant: 'neutral',
-      },
-    ];
+  /** Nome mostrado como rubrica digitada no modal de assinatura. */
+  readonly signatario = computed(() => {
+    const usuario = this.authService.currentUser();
+    return usuario?.name ?? usuario?.email ?? '';
   });
 
-  // Departamentos disponíveis para filtro
-  readonly departments = computed(() => {
-    const list = this.requestsService.requests();
-    const depts = new Set<string>();
-    list.forEach((req) => depts.add(req.departamento));
-    return Array.from(depts).sort();
-  });
+  readonly pendingCount = computed(() => this.contar('PENDENTE'));
+  readonly adjustmentCount = computed(() => this.contar('EM_AJUSTE'));
+  readonly approvedCount = computed(() => this.contar('APROVADA'));
 
-  // Métricas para os quick-cards
-  readonly pendingCount = computed(() => {
-    return this.requestsService.requests().filter((r) => r.status === 'PENDENTE').length;
-  });
-
-  readonly pendingTotalValue = computed(() => {
-    return this.requestsService
+  readonly pendingTotalValue = computed(() =>
+    this.requestsService
       .requests()
       .filter((r) => r.status === 'PENDENTE')
-      .reduce((sum, r) => sum + r.valor, 0);
-  });
-
-  readonly adjustmentCount = computed(() => {
-    return this.requestsService.requests().filter((r) => r.status === 'AJUSTE_SOLICITADO').length;
-  });
-
-  readonly approvedCount = computed(() => {
-    return this.requestsService.requests().filter((r) => r.status === 'APROVADA').length;
-  });
-
-  readonly totalDeliberationsCount = computed(() => {
-    return this.requestsService
-      .requests()
-      .filter((r) => r.status === 'APROVADA' || r.status === 'REJEITADA').length;
-  });
+      .reduce((soma, r) => soma + r.valor, 0),
+  );
 
   readonly approvalRate = computed(() => {
-    const totalDone = this.totalDeliberationsCount();
-    if (totalDone === 0) return 0;
-    return Math.round((this.approvedCount() / totalDone) * 100);
+    const decididas = this.approvedCount() + this.contar('REJEITADA');
+    return decididas === 0 ? 0 : Math.round((this.approvedCount() / decididas) * 100);
   });
 
   readonly pendingPercent = computed(() => {
     const total = this.requestsService.requests().length;
-    if (total === 0) return 0;
-    return Math.round((this.pendingCount() / total) * 100);
+    return total === 0 ? 0 : Math.round((this.pendingCount() / total) * 100);
   });
 
-  // Lista filtrada e ordenada de aprovações
+  readonly headerTabs = computed<PageHeaderTab[]>(() => [
+    { id: 'pendentes', label: 'Para Deliberar', icon: 'hourglass_top', badge: this.pendingCount(), badgeVariant: 'warning' },
+    {
+      id: 'ajustes',
+      label: 'Em Ajuste',
+      icon: 'edit_note',
+      badge: this.adjustmentCount(),
+      badgeVariant: this.adjustmentCount() > 0 ? 'warning' : 'neutral',
+    },
+    { id: 'aprovadas', label: 'Aprovadas', icon: 'verified', badge: this.approvedCount(), badgeVariant: 'success' },
+    { id: 'todas', label: 'Todas', icon: 'list_alt', badge: this.requestsService.requests().length, badgeVariant: 'neutral' },
+  ]);
+
+  readonly departments = computed(() =>
+    [...new Set(this.requestsService.requests().map((r) => r.departamento).filter(Boolean))].sort(),
+  );
+
   readonly filteredRequests = computed<RequestItem[]>(() => {
-    let list = [...this.requestsService.requests()];
     const tab = this.currentTab();
-    const query = this.searchQuery().trim().toLowerCase();
-    const dept = this.selectedDepartment();
-    const cat = this.selectedCategory();
-    const cc = this.selectedCostCenter();
-    const prio = this.selectedPriority();
-    const sort = this.sortBy();
+    const termo = this.searchQuery().trim().toLowerCase();
+    const departamento = this.selectedDepartment();
+    const categoria = this.selectedCategory();
+    const centroDeCusto = this.selectedCostCenter();
 
-    // Filtro por Tab
-    if (tab === 'pendentes') {
-      list = list.filter((r) => r.status === 'PENDENTE');
-    } else if (tab === 'ajustes') {
-      list = list.filter((r) => r.status === 'AJUSTE_SOLICITADO');
-    } else if (tab === 'aprovadas') {
-      list = list.filter((r) => r.status === 'APROVADA');
-    }
+    const lista = this.requestsService
+      .requests()
+      .filter((r) => tab === 'todas' || r.status === STATUS_POR_ABA[tab])
+      .filter((r) => departamento === 'TODOS' || r.departamento === departamento)
+      .filter((r) => categoria === 'TODAS' || r.categoria === categoria)
+      .filter((r) => centroDeCusto === 'TODOS' || r.centroCustoId === centroDeCusto)
+      .filter((r) => !termo || correspondeABusca(r, termo));
 
-    // Filtro por Departamento
-    if (dept !== 'TODOS') {
-      list = list.filter((r) => r.departamento === dept);
-    }
-
-    // Filtro por Categoria
-    if (cat !== 'TODAS') {
-      list = list.filter((r) => r.categoria === cat);
-    }
-
-    // Filtro por Centro de Custo
-    if (cc !== 'TODOS') {
-      list = list.filter((r) => r.centroCustoId === cc);
-    }
-
-    // Filtro por Prioridade
-    if (prio !== 'TODAS') {
-      list = list.filter((r) => r.prioridade === prio);
-    }
-
-    // Filtro por Busca Textual
-    if (query) {
-      list = list.filter(
-        (r) =>
-          r.codigo.toLowerCase().includes(query) ||
-          r.titulo.toLowerCase().includes(query) ||
-          r.solicitante.nome.toLowerCase().includes(query) ||
-          r.solicitante.cargo.toLowerCase().includes(query) ||
-          r.departamento.toLowerCase().includes(query) ||
-          r.centroCustoNome.toLowerCase().includes(query)
-      );
-    }
-
-    // Ordenação
-    if (sort === 'maior_valor') {
-      list.sort((a, b) => b.valor - a.valor);
-    } else if (sort === 'menor_valor') {
-      list.sort((a, b) => a.valor - b.valor);
-    } else if (sort === 'prioridade') {
-      const pWeights: Record<RequestPriority, number> = {
-        CRITICA: 4,
-        ALTA: 3,
-        MEDIA: 2,
-        BAIXA: 1,
-      };
-      list.sort((a, b) => pWeights[b.prioridade] - pWeights[a.prioridade]);
-    } else {
-      // Recentes (dataCriacao decrescente)
-      list.sort((a, b) => new Date(b.dataCriacao).getTime() - new Date(a.dataCriacao).getTime());
-    }
-
-    return list;
+    return ordenar(lista, this.sortBy());
   });
 
-  // Lista paginada
   readonly paginatedRequests = computed<RequestItem[]>(() => {
-    const list = this.filteredRequests();
-    const page = this.currentPage();
-    const size = this.pageSize();
-    const start = (page - 1) * size;
-    return list.slice(start, start + size);
+    const inicio = (this.currentPage() - 1) * this.pageSize();
+    return this.filteredRequests().slice(inicio, inicio + this.pageSize());
   });
 
-  readonly totalPages = computed<number>(() => {
-    const total = this.filteredRequests().length;
-    const size = this.pageSize();
-    return Math.max(1, Math.ceil(total / size));
-  });
+  readonly totalPages = computed(() => Math.max(1, Math.ceil(this.filteredRequests().length / this.pageSize())));
 
-  // Seleção em lote
   readonly selectedItems = computed(() => {
     const ids = this.selectedIds();
     return this.requestsService.requests().filter((r) => ids.has(r.id));
   });
 
-  readonly selectedTotalValue = computed(() => {
-    return this.selectedItems().reduce((sum, r) => sum + r.valor, 0);
-  });
+  /** Só entram no lote as selecionadas que este usuário pode decidir. */
+  readonly decidableSelectedItems = computed(() => this.selectedItems().filter((r) => this.podeDecidirSobre(r)));
+
+  readonly selectedTotalValue = computed(() => this.selectedItems().reduce((soma, r) => soma + r.valor, 0));
 
   readonly isAllSelected = computed(() => {
-    const currentList = this.paginatedRequests();
-    if (currentList.length === 0) return false;
-    return currentList.every((r) => this.selectedIds().has(r.id));
+    const pagina = this.paginatedRequests();
+    return pagina.length > 0 && pagina.every((r) => this.selectedIds().has(r.id));
   });
 
-  // Compatibilidade com activeTab
-  activeTab(): ApprovalsTab {
-    return this.currentTab();
+  ngOnInit(): void {
+    this.requestsService.ensureLoaded();
   }
 
-  // Ações de Aba, Busca e Filtros
+  reload(): void {
+    this.requestsService.load();
+  }
+
+  /** Aprovador com papel de decisão, solicitação pendente e sem ser o autor (CA-04.1). */
+  podeDecidirSobre(req: RequestItem): boolean {
+    const usuario = this.authService.currentUser();
+    return req.status === 'PENDENTE' && podeDecidir(usuario?.role) && req.solicitante.id !== usuario?.id;
+  }
+
+  // Abas, busca e filtros
   setTab(tab: ApprovalsTab): void {
     this.currentTab.set(tab);
     this.currentPage.set(1);
@@ -281,85 +195,96 @@ export class ApprovalsComponent {
     this.currentPage.set(1);
   }
 
-  setDepartmentFilter(dept: string): void {
-    this.selectedDepartment.set(dept);
+  setDepartmentFilter(departamento: string): void {
+    this.selectedDepartment.set(departamento);
     this.currentPage.set(1);
   }
 
-  setCategoryFilter(cat: string): void {
-    this.selectedCategory.set(cat);
+  setCategoryFilter(categoria: string): void {
+    this.selectedCategory.set(categoria);
     this.currentPage.set(1);
   }
 
-  setCostCenterFilter(cc: string): void {
-    this.selectedCostCenter.set(cc);
+  setCostCenterFilter(centroDeCusto: string): void {
+    this.selectedCostCenter.set(centroDeCusto);
     this.currentPage.set(1);
   }
 
-  setPriorityFilter(prio: string): void {
-    this.selectedPriority.set(prio);
-    this.currentPage.set(1);
+  clearFilters(): void {
+    this.setTab('todas');
+    this.setSearchQuery('');
+    this.setDepartmentFilter('TODOS');
+    this.setCategoryFilter('TODAS');
+    this.setCostCenterFilter('TODOS');
   }
 
-  setSortBy(sort: 'recentes' | 'maior_valor' | 'menor_valor' | 'prioridade'): void {
-    this.sortBy.set(sort);
+  setSortBy(ordem: ApprovalsSort): void {
+    this.sortBy.set(ordem);
   }
 
   toggleKpis(): void {
     this.showKpis.update((v) => !v);
   }
 
-  // Ações de Paginação
-  setPage(page: number): void {
-    if (page >= 1 && page <= this.totalPages()) {
-      this.currentPage.set(page);
+  // Paginação
+  setPage(pagina: number): void {
+    if (pagina >= 1 && pagina <= this.totalPages()) {
+      this.currentPage.set(pagina);
     }
   }
 
-  setPageSize(size: number): void {
-    this.pageSize.set(Number(size));
+  setPageSize(tamanho: number): void {
+    this.pageSize.set(Number(tamanho));
     this.currentPage.set(1);
   }
 
-  // Ações de Seleção
+  // Seleção
   toggleSelect(id: string): void {
-    this.selectedIds.update((set) => {
-      const next = new Set(set);
-      if (next.has(id)) {
-        next.delete(id);
+    this.selectedIds.update((atual) => {
+      const proximo = new Set(atual);
+      if (proximo.has(id)) {
+        proximo.delete(id);
       } else {
-        next.add(id);
+        proximo.add(id);
       }
-      return next;
+      return proximo;
     });
   }
 
   toggleSelectAll(): void {
-    const currentList = this.paginatedRequests();
     if (this.isAllSelected()) {
       this.clearSelection();
-    } else {
-      const next = new Set(this.selectedIds());
-      currentList.forEach((r) => next.add(r.id));
-      this.selectedIds.set(next);
+      return;
     }
+    const proximo = new Set(this.selectedIds());
+    this.paginatedRequests().forEach((r) => proximo.add(r.id));
+    this.selectedIds.set(proximo);
   }
 
   clearSelection(): void {
     this.selectedIds.set(new Set());
   }
 
-  // Visualização no Drawer
+  // Detalhe e trilha (US-07)
   openDetailDrawer(req: RequestItem): void {
     this.selectedRequest.set(req);
     this.isDetailDrawerOpen.set(true);
+    this.trailSteps.set([]);
+    this.trailState.set('carregando');
+    this.requestsService.loadTrail(req.id).subscribe({
+      next: (etapas) => {
+        this.trailSteps.set(etapas);
+        this.trailState.set('pronto');
+      },
+      error: () => this.trailState.set('erro'),
+    });
   }
 
   closeDetailDrawer(): void {
     this.isDetailDrawerOpen.set(false);
   }
 
-  // Fluxo de Assinatura Digital
+  // Aprovação (T02)
   openSignModal(req: RequestItem): void {
     this.signingRequest.set(req);
     this.isBatchSignMode.set(false);
@@ -367,9 +292,11 @@ export class ApprovalsComponent {
   }
 
   openBatchSignModal(): void {
-    if (this.selectedIds().size === 0) return;
-    const firstSelected = this.selectedItems()[0] || null;
-    this.signingRequest.set(firstSelected);
+    const decidiveis = this.decidableSelectedItems();
+    if (decidiveis.length === 0) {
+      return;
+    }
+    this.signingRequest.set(decidiveis[0]);
     this.isBatchSignMode.set(true);
     this.isSignModalOpen.set(true);
   }
@@ -380,59 +307,22 @@ export class ApprovalsComponent {
     this.isBatchSignMode.set(false);
   }
 
-  onSignatureConfirmed(confirmation: SignatureConfirmation): void {
+  onSignatureConfirmed(confirmacao: SignatureConfirmation): void {
     if (this.isBatchSignMode()) {
-      const ids = Array.from(this.selectedIds());
-      const approvedCount = this.requestsService.approveBatch(ids, confirmation.signatureDataUrl);
-      this.closeSignModal();
-      this.clearSelection();
-      this.triggerToast(
-        'Aprovação em Lote Concluída',
-        `${approvedCount} solicitações foram assinadas digitalmente e deliberadas com sucesso.`,
-        'success'
-      );
-    } else {
-      const req = this.signingRequest();
-      if (!req) return;
-      this.requestsService.approveRequest(
-        req.id,
-        confirmation.signatureDataUrl,
-        confirmation.comentario
-      );
-      this.closeSignModal();
-      this.triggerToast(
-        'Solicitação Aprovada & Assinada',
-        `A solicitação ${req.codigo} foi assinada digitalmente com certificação SHA-256.`,
-        'success'
-      );
+      this.aprovarEmLote(confirmacao.comentario);
+      return;
     }
+    const req = this.signingRequest();
+    if (!req) {
+      return;
+    }
+    this.decidir(req, 'aprovar', confirmacao.comentario, () => {
+      this.closeSignModal();
+      this.triggerToast('Solicitação aprovada', `${req.codigo} foi aprovada e registrada na trilha de auditoria.`, 'success');
+    });
   }
 
-  // Fluxo de Validação Técnica
-  openValidateModal(req: RequestItem): void {
-    this.validatingRequest.set(req);
-    this.validationNote.set(
-      'Conformidade técnica e orçamentária atestada em conformidade com o regimento interno de governança.'
-    );
-  }
-
-  closeValidateModal(): void {
-    this.validatingRequest.set(null);
-  }
-
-  confirmValidation(): void {
-    const req = this.validatingRequest();
-    if (!req) return;
-    this.requestsService.validateRequest(req.id, this.validationNote().trim());
-    this.closeValidateModal();
-    this.triggerToast(
-      'Validação Técnica Registrada',
-      `O parecer de conformidade foi registrado na trilha de auditoria de ${req.codigo}.`,
-      'info'
-    );
-  }
-
-  // Fluxo de Solicitação de Ajuste / Revisão
+  // Pedido de ajuste (T04)
   openAdjustmentModal(req: RequestItem): void {
     this.adjustingRequest.set(req);
     this.adjustmentReason.set('');
@@ -444,19 +334,16 @@ export class ApprovalsComponent {
 
   confirmAdjustment(): void {
     const req = this.adjustingRequest();
-    const reason = this.adjustmentReason().trim();
-    if (!req || !reason) return;
-
-    this.requestsService.requestAdjustment(req.id, reason, 'Comitê de Alçadas / Aprovador');
-    this.closeAdjustmentModal();
-    this.triggerToast(
-      'Revisão Solicitada',
-      `A solicitação ${req.codigo} foi devolvida ao solicitante para complementação das informações.`,
-      'warning'
-    );
+    if (!req || !this.motivoValido(this.adjustmentReason())) {
+      return;
+    }
+    this.decidir(req, 'ajuste', this.adjustmentReason(), () => {
+      this.closeAdjustmentModal();
+      this.triggerToast('Ajuste solicitado', `${req.codigo} voltou para o solicitante complementar.`, 'warning');
+    });
   }
 
-  // Fluxo de Rejeição / Recusa
+  // Rejeição (T03)
   openRejectModal(req: RequestItem): void {
     this.rejectingRequest.set(req);
     this.rejectionReason.set('');
@@ -468,56 +355,98 @@ export class ApprovalsComponent {
 
   confirmRejection(): void {
     const req = this.rejectingRequest();
-    const reason = this.rejectionReason().trim();
-    if (!req || !reason) return;
-
-    this.requestsService.rejectRequest(req.id, reason, 'Diretoria Executiva');
-    this.closeRejectModal();
-    this.triggerToast(
-      'Solicitação Recusada',
-      `A solicitação ${req.codigo} foi encerrada e rejeitada no fluxo de governança.`,
-      'error'
-    );
+    if (!req || !this.motivoValido(this.rejectionReason())) {
+      return;
+    }
+    this.decidir(req, 'rejeitar', this.rejectionReason(), () => {
+      this.closeRejectModal();
+      this.triggerToast('Solicitação rejeitada', `${req.codigo} foi encerrada como rejeitada.`, 'error');
+    });
   }
 
-  // Helpers visuais idênticos à tela de solicitações
+  /** O motivo precisa de pelo menos 10 caracteres (CA-03.2). */
+  motivoValido(motivo: string): boolean {
+    return motivo.trim().length >= MOTIVO_MINIMO_DA_DECISAO;
+  }
+
   getStatusBadgeClass(status: RequestStatus): string {
     switch (status) {
       case 'APROVADA':
         return 'status-success';
       case 'PENDENTE':
         return 'status-warning';
-      case 'AJUSTE_SOLICITADO':
+      case 'EM_AJUSTE':
         return 'status-adjust';
       case 'REJEITADA':
-      case 'CANCELADA':
         return 'status-danger';
       default:
         return 'status-neutral';
     }
   }
 
-  getPriorityBadgeClass(priority: RequestPriority): string {
-    switch (priority) {
-      case 'CRITICA':
-        return 'priority-critical';
-      case 'ALTA':
-        return 'priority-high';
-      case 'MEDIA':
-        return 'priority-medium';
-      case 'BAIXA':
-        return 'priority-low';
+  getStatusBadgeVariant(status: RequestStatus): 'success' | 'warning' | 'neutral' {
+    if (status === 'APROVADA') {
+      return 'success';
     }
+    return status === 'PENDENTE' ? 'warning' : 'neutral';
   }
 
-  triggerToast(
-    title: string,
-    message: string,
-    type: 'success' | 'warning' | 'error' | 'info'
-  ): void {
+  triggerToast(title: string, message: string, type: ToastType): void {
+    clearTimeout(this.toastTimer);
     this.toast.set({ title, message, type });
-    setTimeout(() => {
-      this.toast.set(null);
-    }, 4500);
+    this.toastTimer = setTimeout(() => this.toast.set(null), DURACAO_DO_TOAST_MS);
   }
+
+  private decidir(req: RequestItem, acao: DecisionAction, texto: string, aoConcluir: () => void): void {
+    this.isDeciding.set(true);
+    this.requestsService.decide(req, acao, texto).subscribe({
+      next: () => {
+        this.isDeciding.set(false);
+        aoConcluir();
+      },
+      error: (erro: unknown) => {
+        this.isDeciding.set(false);
+        this.triggerToast('Não foi possível registrar a decisão', mensagemDeErroDaApi(erro), 'error');
+      },
+    });
+  }
+
+  private aprovarEmLote(observacao: string): void {
+    this.isDeciding.set(true);
+    this.requestsService.approveMany(this.decidableSelectedItems(), observacao).subscribe((resultado) => {
+      this.isDeciding.set(false);
+      this.closeSignModal();
+      this.clearSelection();
+      if (resultado.erros.length === 0) {
+        this.triggerToast('Aprovação em lote concluída', `${resultado.aprovadas} solicitações aprovadas.`, 'success');
+      } else {
+        this.triggerToast(
+          `${resultado.aprovadas} aprovadas, ${resultado.erros.length} com erro`,
+          resultado.erros.join(' · '),
+          'warning',
+        );
+      }
+    });
+  }
+
+  private contar(status: RequestStatus): number {
+    return this.requestsService.requests().filter((r) => r.status === status).length;
+  }
+}
+
+function correspondeABusca(r: RequestItem, termo: string): boolean {
+  return [r.codigo, r.titulo, r.solicitante.nome, r.departamento, r.centroCustoNome].some((campo) =>
+    campo.toLowerCase().includes(termo),
+  );
+}
+
+function ordenar(lista: RequestItem[], ordem: ApprovalsSort): RequestItem[] {
+  const copia = [...lista];
+  if (ordem === 'maior_valor') {
+    return copia.sort((a, b) => b.valor - a.valor);
+  }
+  if (ordem === 'menor_valor') {
+    return copia.sort((a, b) => a.valor - b.valor);
+  }
+  return copia.sort((a, b) => new Date(b.dataCriacao).getTime() - new Date(a.dataCriacao).getTime());
 }

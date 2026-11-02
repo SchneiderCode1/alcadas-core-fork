@@ -4,7 +4,7 @@
 <app-page-header
   breadcrumbRoot="Aprovações"
   breadcrumbCurrent="Minhas Aprovações"
-  searchPlaceholder="Search..."
+  searchPlaceholder="Buscar por código, solicitante ou centro de custo..."
   [searchQuery]="searchQuery()"
   (searchQueryChange)="setSearchQuery($event)"
   contextIcon="how_to_reg"
@@ -24,22 +24,13 @@
 
     <button
       type="button"
-      class="btn-header-outline"
-      (click)="triggerToast('Exportação Iniciada', 'Exportando dados de deliberação em formato CSV...', 'info')"
-    >
-      <span class="material-symbols-rounded">file_download</span>
-      <span>Exportar</span>
-    </button>
-
-    <button
-      type="button"
       class="btn-header-primary"
-      [disabled]="selectedIds().size === 0"
+      [disabled]="decidableSelectedItems().length === 0 || isDeciding()"
       (click)="openBatchSignModal()"
-      title="Assinar e aprovar todas as solicitações selecionadas"
+      title="Aprovar as solicitações selecionadas que você pode decidir"
     >
       <span class="material-symbols-rounded">done_all</span>
-      <span>Aprovar em Lote ({{ selectedIds().size }})</span>
+      <span>Aprovar em Lote ({{ decidableSelectedItems().length }})</span>
     </button>
   </div>
 
@@ -84,7 +75,7 @@
           <span class="quick-card-value text-warning">{{ pendingCount() }}</span>
           <div class="quick-card-bottom-info">
             <strong class="bottom-amount">{{ pendingTotalValue() | currency:'BRL':'symbol':'1.2-2' }}</strong>
-            <span class="bottom-desc">aguardando sua assinatura</span>
+            <span class="bottom-desc">aguardando decisão</span>
           </div>
         </article>
 
@@ -106,13 +97,13 @@
         <!-- Card 4: Requer Ajuste -->
         <article class="quick-card" [class.highlight-warning]="adjustmentCount() > 0">
           <div class="quick-card-top">
-            <span class="quick-card-tag tag-adjust">Revisões</span>
+            <span class="quick-card-tag tag-adjust">Em Ajuste</span>
             <span class="material-symbols-rounded quick-card-icon text-adjust">edit_notifications</span>
           </div>
           <span class="quick-card-value text-adjust">{{ adjustmentCount() }}</span>
           <div class="quick-card-bottom-info">
             <span class="bottom-desc" [class.text-adjust]="adjustmentCount() > 0">
-              {{ adjustmentCount() > 0 ? adjustmentCount() + ' aguardando revisão do solicitante' : 'Nenhuma pendência ativa' }}
+              {{ adjustmentCount() > 0 ? adjustmentCount() + ' aguardando ajuste do solicitante' : 'Nenhuma pendência ativa' }}
             </span>
           </div>
         </article>
@@ -164,7 +155,7 @@
             (ngModelChange)="setCostCenterFilter($event)"
           >
             <option value="TODOS">Todos os Centros</option>
-            @for (cc of requestsService.costCenters; track cc.id) {
+            @for (cc of requestsService.costCenters(); track cc.id) {
               <option [value]="cc.id">{{ cc.code }} - {{ cc.nome }}</option>
             }
           </select>
@@ -182,7 +173,6 @@
             <option value="recentes">Mais Recentes</option>
             <option value="maior_valor">Maior Valor (R$)</option>
             <option value="menor_valor">Menor Valor (R$)</option>
-            <option value="prioridade">Maior Prioridade</option>
           </select>
         </div>
       </div>
@@ -205,9 +195,14 @@
           <button type="button" class="btn-batch-clear" (click)="clearSelection()">
             Cancelar Seleção
           </button>
-          <button type="button" class="btn-batch-approve" (click)="openBatchSignModal()">
+          <button
+            type="button"
+            class="btn-batch-approve"
+            [disabled]="decidableSelectedItems().length === 0 || isDeciding()"
+            (click)="openBatchSignModal()"
+          >
             <span class="material-symbols-rounded">draw</span>
-            <span>Assinar e Aprovar Selecionadas</span>
+            <span>Aprovar {{ decidableSelectedItems().length }} que posso decidir</span>
           </button>
         </div>
       </div>
@@ -242,7 +237,27 @@
           </thead>
 
           <tbody>
-            @if (paginatedRequests().length === 0) {
+            @if (requestsService.loadState() === 'carregando') {
+              <tr>
+                <td colspan="9" class="td-empty">
+                  <div class="empty-state-box">
+                    <span class="material-symbols-rounded empty-icon spin-icon">progress_activity</span>
+                    <h3 class="empty-title">Carregando…</h3>
+                  </div>
+                </td>
+              </tr>
+            } @else if (requestsService.loadState() === 'erro') {
+              <tr>
+                <td colspan="9" class="td-empty">
+                  <div class="empty-state-box">
+                    <span class="material-symbols-rounded empty-icon">cloud_off</span>
+                    <h3 class="empty-title">Não foi possível carregar as solicitações</h3>
+                    <p class="empty-desc">{{ requestsService.loadError() }}</p>
+                    <button type="button" class="btn-header-outline" (click)="reload()">Tentar novamente</button>
+                  </div>
+                </td>
+              </tr>
+            } @else if (paginatedRequests().length === 0) {
               <tr>
                 <td colspan="9" class="td-empty">
                   <div class="empty-state-box">
@@ -252,7 +267,7 @@
                     <button
                       type="button"
                       class="btn-header-outline"
-                      (click)="setTab('todas'); setSearchQuery(''); setDepartmentFilter('TODOS'); setCategoryFilter('TODAS'); setCostCenterFilter('TODOS')"
+                      (click)="clearFilters()"
                     >
                       Limpar Filtros
                     </button>
@@ -280,9 +295,6 @@
 
                   <td class="td-code">
                     <span class="req-code">{{ req.codigo }}</span>
-                    <span class="priority-pill" [ngClass]="getPriorityBadgeClass(req.prioridade)">
-                      {{ req.prioridade }}
-                    </span>
                   </td>
 
                   <td class="td-title">
@@ -328,46 +340,39 @@
 
                   <td class="td-actions" (click)="$event.stopPropagation()">
                     <div class="action-buttons-group">
-                      @if (req.status === 'PENDENTE') {
-                        <!-- Botão Assinar Digitalmente (Principal) -->
+                      @if (podeDecidirSobre(req)) {
+                        <!-- Aprovar (T02) -->
                         <button
                           type="button"
                           class="btn-act-sign"
+                          [disabled]="isDeciding()"
                           (click)="openSignModal(req)"
-                          title="Assinar digitalmente e aprovar solicitação"
+                          title="Aprovar solicitação"
                         >
                           <span class="material-symbols-rounded">draw</span>
-                          <span>Assinar</span>
+                          <span>Aprovar</span>
                         </button>
 
-                        <!-- Botão Validar Tecnicamente -->
-                        <button
-                          type="button"
-                          class="btn-act-validate"
-                          (click)="openValidateModal(req)"
-                          title="Registrar parecer ou validação técnica"
-                        >
-                          <span class="material-symbols-rounded">task_alt</span>
-                          <span>Validar</span>
-                        </button>
-
-                        <!-- Botão Solicitar Revisão / Ajuste -->
+                        <!-- Pedir ajuste (T04) -->
                         <button
                           type="button"
                           class="btn-act-adjust"
+                          [disabled]="isDeciding()"
                           (click)="openAdjustmentModal(req)"
-                          title="Solicitar revisão ao solicitante"
+                          title="Pedir ajuste ao solicitante"
                         >
                           <span class="material-symbols-rounded">edit_note</span>
-                          <span>Revisar</span>
+                          <span>Ajuste</span>
                         </button>
 
-                        <!-- Botão Recusar / Negar -->
+                        <!-- Rejeitar (T03) -->
                         <button
                           type="button"
                           class="btn-act-reject"
+                          [disabled]="isDeciding()"
                           (click)="openRejectModal(req)"
-                          title="Recusar solicitação"
+                          title="Rejeitar solicitação"
+                          aria-label="Rejeitar solicitação {{ req.codigo }}"
                         >
                           <span class="material-symbols-rounded">close</span>
                         </button>
@@ -472,7 +477,7 @@
     [subtitle]="selectedRequest()?.titulo"
     icon="timeline"
     width="580px"
-    [badge]="selectedRequest() ? { text: selectedRequest()!.statusLabel, variant: selectedRequest()!.status === 'APROVADA' ? 'success' : selectedRequest()!.status === 'PENDENTE' ? 'warning' : 'neutral' } : undefined"
+    [badge]="selectedRequest() ? { text: selectedRequest()!.statusLabel, variant: getStatusBadgeVariant(selectedRequest()!.status) } : undefined"
     (closed)="closeDetailDrawer()"
   >
     @if (selectedRequest(); as req) {
@@ -506,10 +511,6 @@
               <span class="meta-val">{{ req.categoriaLabel }}</span>
             </div>
             <div class="meta-item">
-              <span class="meta-label">Prioridade</span>
-              <span class="meta-val font-semibold">{{ req.prioridade }}</span>
-            </div>
-            <div class="meta-item">
               <span class="meta-label">Solicitante</span>
               <span class="meta-val font-semibold">{{ req.solicitante.nome }}</span>
             </div>
@@ -531,124 +532,103 @@
           </div>
         </div>
 
-        <!-- Anexos e Comprovantes -->
-        <div class="detail-section">
-          <h4 class="section-heading">
-            <span class="material-symbols-rounded">attach_file</span>
-            <span>Comprovantes & Cotações Anexadas ({{ req.anexos.length }})</span>
-          </h4>
-          <div class="attachments-list">
-            @for (att of req.anexos; track att.id) {
-              <div class="attachment-item">
-                <span class="material-symbols-rounded att-icon">{{ att.icone }}</span>
-                <div class="att-info">
-                  <span class="att-name">{{ att.nome }}</span>
-                  <span class="att-size">{{ att.tamanho }}</span>
-                </div>
-                <button type="button" class="btn-att-download" title="Visualizar anexo">
-                  <span class="material-symbols-rounded">visibility</span>
-                </button>
-              </div>
-            }
-          </div>
-        </div>
-
-        <!-- Trilha de Aprovação das Etapas do Fluxo com Assinatura SHA-256 -->
+        <!-- Trilha de auditoria SHA-256 (US-07) -->
         <div class="workflow-timeline-section">
           <div class="timeline-header">
             <div class="timeline-title-row">
               <span class="material-symbols-rounded timeline-header-icon">account_tree</span>
               <div>
-                <h3 class="timeline-heading">Trilha do Fluxo de Alçada</h3>
-                <p class="timeline-subheading">{{ req.fluxoDestinado.nome }} ({{ req.fluxoDestinado.totalEtapas }} etapas)</p>
+                <h3 class="timeline-heading">Trilha de Auditoria</h3>
+                <p class="timeline-subheading">{{ req.fluxoDestinado.nome }} · {{ req.fluxoDestinado.etapaAtualNome }}</p>
               </div>
             </div>
           </div>
 
-          <div class="timeline-stepper-vertical">
-            @for (step of req.fluxoDestinado.etapas; track step.numero) {
-              <div
-                class="timeline-step-item"
-                [class.is-done]="step.status === 'CONCLUIDA'"
-                [class.is-current]="step.status === 'EM_ANALISE' || step.status === 'AJUSTE'"
-                [class.is-reject]="step.status === 'REJEITADA'"
-              >
-                <div class="step-marker-col">
-                  <div class="step-marker-circle">
-                    @if (step.status === 'CONCLUIDA') {
-                      <span class="material-symbols-rounded step-marker-icon">check</span>
-                    } @else if (step.status === 'REJEITADA') {
-                      <span class="material-symbols-rounded step-marker-icon">close</span>
-                    } @else if (step.status === 'AJUSTE') {
-                      <span class="material-symbols-rounded step-marker-icon">edit_note</span>
-                    } @else {
-                      <span class="step-num">{{ step.numero }}</span>
+          @if (trailState() === 'carregando') {
+            <p class="timeline-subheading">Carregando a trilha…</p>
+          } @else if (trailState() === 'erro') {
+            <p class="timeline-subheading">Não foi possível carregar a trilha desta solicitação.</p>
+          } @else {
+            <div class="timeline-stepper-vertical">
+              @for (step of trailSteps(); track step.numero) {
+                <div
+                  class="timeline-step-item"
+                  [class.is-done]="step.status === 'CONCLUIDA'"
+                  [class.is-current]="step.status === 'EM_ANALISE' || step.status === 'AJUSTE'"
+                  [class.is-reject]="step.status === 'REJEITADA'"
+                >
+                  <div class="step-marker-col">
+                    <div class="step-marker-circle">
+                      @if (step.status === 'CONCLUIDA') {
+                        <span class="material-symbols-rounded step-marker-icon">check</span>
+                      } @else if (step.status === 'REJEITADA') {
+                        <span class="material-symbols-rounded step-marker-icon">close</span>
+                      } @else if (step.status === 'AJUSTE') {
+                        <span class="material-symbols-rounded step-marker-icon">edit_note</span>
+                      } @else {
+                        <span class="step-num">{{ step.numero }}</span>
+                      }
+                    </div>
+                    @if (!$last) {
+                      <div class="step-connector-line"></div>
                     }
                   </div>
-                  @if (step.numero < req.fluxoDestinado.etapas.length) {
-                    <div class="step-connector-line"></div>
-                  }
-                </div>
 
-                <div class="step-details-col">
-                  <div class="step-header">
-                    <span class="step-name">{{ step.nome }}</span>
-                    <span class="step-role-badge">{{ step.papel }}</span>
-                  </div>
-
-                  @if (step.responsavelNome) {
-                    <span class="step-assignee">Responsável: <strong>{{ step.responsavelNome }}</strong></span>
-                  }
-
-                  @if (step.dataHora) {
-                    <span class="step-timestamp">{{ step.dataHora }}</span>
-                  }
-
-                  @if (step.comentario) {
-                    <div class="step-comment-bubble">
-                      <span class="material-symbols-rounded comment-icon">chat</span>
-                      <p class="comment-text">{{ step.comentario }}</p>
+                  <div class="step-details-col">
+                    <div class="step-header">
+                      <span class="step-name">{{ step.nome }}</span>
+                      <span class="step-role-badge">{{ step.papel }}</span>
                     </div>
-                  }
 
-                  <!-- Card de Assinatura Digital Auditada SHA-256 -->
-                  @if (step.assinatura) {
-                    <div class="signature-audit-stamp">
-                      <div class="stamp-top">
-                        <span class="material-symbols-rounded stamp-icon">verified</span>
-                        <strong>Assinatura Digital Auditada</strong>
+                    @if (step.responsavelNome) {
+                      <span class="step-assignee">Responsável: <strong>{{ step.responsavelNome }}</strong></span>
+                    }
+
+                    @if (step.dataHora) {
+                      <span class="step-timestamp">{{ step.dataHora }}</span>
+                    }
+
+                    @if (step.comentario) {
+                      <div class="step-comment-bubble">
+                        <span class="material-symbols-rounded comment-icon">chat</span>
+                        <p class="comment-text">{{ step.comentario }}</p>
                       </div>
-                      @if (step.assinatura.assinaturaImg) {
-                        <div class="signature-canvas-preview">
-                          <img [src]="step.assinatura.assinaturaImg" alt="Rubrica do Signatário" class="signature-preview-img" />
+                    }
+
+                    @if (step.hashSha256) {
+                      <div class="signature-audit-stamp">
+                        <div class="stamp-top">
+                          <span class="material-symbols-rounded stamp-icon">verified</span>
+                          <strong>Elo da trilha de auditoria</strong>
                         </div>
-                      }
-                      <div class="stamp-footer">
-                        <span>Signatário: <strong>{{ step.assinatura.signatario }}</strong> ({{ step.assinatura.cargo }})</span>
-                        <span class="hash-label">Hash SHA-256: <code>{{ step.assinatura.hashSha256 }}</code></span>
+                        <div class="stamp-footer">
+                          <span class="hash-label">SHA-256: <code [title]="step.hashSha256">{{ step.hashSha256 | slice: 0 : 16 }}…</code></span>
+                        </div>
                       </div>
-                    </div>
-                  }
+                    }
+                  </div>
                 </div>
-              </div>
-            }
-          </div>
+              }
+            </div>
+          }
         </div>
 
-        <!-- Ações no Rodapé do Drawer se Pendente -->
-        @if (req.status === 'PENDENTE') {
+        <!-- Ações no rodapé do detalhe -->
+        @if (podeDecidirSobre(req)) {
           <div class="drawer-action-footer">
             <button
               type="button"
               class="btn-drawer-sign"
+              [disabled]="isDeciding()"
               (click)="closeDetailDrawer(); openSignModal(req)"
             >
               <span class="material-symbols-rounded">draw</span>
-              <span>Assinar & Aprovar Agora</span>
+              <span>Aprovar</span>
             </button>
             <button
               type="button"
               class="btn-drawer-adjust"
+              [disabled]="isDeciding()"
               (click)="closeDetailDrawer(); openAdjustmentModal(req)"
             >
               <span class="material-symbols-rounded">edit_note</span>
@@ -667,65 +647,10 @@
 <app-digital-signature-modal
   [isOpen]="isSignModalOpen()"
   [request]="signingRequest()"
+  [signatario]="signatario()"
   (confirmed)="onSignatureConfirmed($event)"
   (closed)="closeSignModal()"
 />
-
-<!-- ========================================================================= -->
-<!-- MODAL DE VALIDAÇÃO TÉCNICA                                                -->
-<!-- ========================================================================= -->
-@if (validatingRequest(); as vReq) {
-  <div class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-validate-title">
-    <button
-      type="button"
-      class="modal-backdrop"
-      (click)="closeValidateModal()"
-      tabindex="-1"
-      aria-label="Fechar modal de validação"
-    ></button>
-
-    <div class="modal-card-small">
-      <div class="modal-small-header">
-        <div class="title-row">
-          <span class="material-symbols-rounded icon-validate">task_alt</span>
-          <h3 id="modal-validate-title">Registrar Validação Técnica</h3>
-        </div>
-        <button type="button" class="btn-close-sm" (click)="closeValidateModal()" aria-label="Fechar">
-          <span class="material-symbols-rounded">close</span>
-        </button>
-      </div>
-
-      <div class="modal-small-body">
-        <p class="modal-intro">
-          Ateste a conferência documental e conformidade orçamentária para a solicitação
-          <strong>{{ vReq.codigo }}</strong> ({{ vReq.departamento }}).
-        </p>
-
-        <div class="form-group">
-          <label for="validationNoteInput" class="form-label">Parecer Técnico / Notas de Conformidade:</label>
-          <textarea
-            id="validationNoteInput"
-            class="form-textarea"
-            rows="3"
-            [ngModel]="validationNote()"
-            (ngModelChange)="validationNote.set($event)"
-            placeholder="Descreva o parecer técnico..."
-          ></textarea>
-        </div>
-      </div>
-
-      <div class="modal-small-footer">
-        <button type="button" class="btn-sm-cancel" (click)="closeValidateModal()">
-          Cancelar
-        </button>
-        <button type="button" class="btn-sm-confirm-validate" (click)="confirmValidation()">
-          <span class="material-symbols-rounded">check</span>
-          <span>Gravar Validação</span>
-        </button>
-      </div>
-    </div>
-  </div>
-}
 
 <!-- ========================================================================= -->
 <!-- MODAL DE SOLICITAÇÃO DE AJUSTE / REVISÃO                                   -->
@@ -744,7 +669,7 @@
       <div class="modal-small-header header-warning">
         <div class="title-row">
           <span class="material-symbols-rounded icon-adjust">edit_note</span>
-          <h3 id="modal-adjust-title">Solicitar Revisão ao Solicitante</h3>
+          <h3 id="modal-adjust-title">Pedir Ajuste ao Solicitante</h3>
         </div>
         <button type="button" class="btn-close-sm" (click)="closeAdjustmentModal()" aria-label="Fechar">
           <span class="material-symbols-rounded">close</span>
@@ -758,14 +683,14 @@
         </p>
 
         <div class="form-group">
-          <label for="adjustmentReasonInput" class="form-label">Motivo da Devolução / Itens a Corrigir: <span class="required">*</span></label>
+          <label for="adjustmentReasonInput" class="form-label">Motivo do ajuste (mín. {{ motivoMinimo }} caracteres): <span class="required">*</span></label>
           <textarea
             id="adjustmentReasonInput"
             class="form-textarea"
             rows="4"
             [ngModel]="adjustmentReason()"
             (ngModelChange)="adjustmentReason.set($event)"
-            placeholder="Ex: Favor anexar 3 orçamentos comparativos de marcas diferentes e detalhar o cronograma de entrega..."
+            placeholder="Ex: Detalhe o fornecedor e o prazo de entrega na justificativa."
           ></textarea>
         </div>
       </div>
@@ -777,11 +702,11 @@
         <button
           type="button"
           class="btn-sm-confirm-adjust"
-          [disabled]="!adjustmentReason().trim()"
+          [disabled]="!motivoValido(adjustmentReason()) || isDeciding()"
           (click)="confirmAdjustment()"
         >
           <span class="material-symbols-rounded">send</span>
-          <span>Devolver para Ajuste</span>
+          <span>Pedir Ajuste</span>
         </button>
       </div>
     </div>
@@ -798,14 +723,14 @@
       class="modal-backdrop"
       (click)="closeRejectModal()"
       tabindex="-1"
-      aria-label="Fechar modal de recusa"
+      aria-label="Fechar modal de rejeição"
     ></button>
 
     <div class="modal-card-small">
       <div class="modal-small-header header-danger">
         <div class="title-row">
           <span class="material-symbols-rounded icon-reject">cancel</span>
-          <h3 id="modal-reject-title">Recusar Solicitação de Alçada</h3>
+          <h3 id="modal-reject-title">Rejeitar Solicitação</h3>
         </div>
         <button type="button" class="btn-close-sm" (click)="closeRejectModal()" aria-label="Fechar">
           <span class="material-symbols-rounded">close</span>
@@ -814,12 +739,11 @@
 
       <div class="modal-small-body">
         <p class="modal-intro text-danger">
-          Atenção: A recusa encerra o fluxo de aprovação da solicitação <strong>{{ rejReq.codigo }}</strong>
-          definitivamente no sistema de governança.
+          Atenção: a rejeição encerra a solicitação <strong>{{ rejReq.codigo }}</strong> de forma definitiva.
         </p>
 
         <div class="form-group">
-          <label for="rejectionReasonInput" class="form-label">Justificativa Formal de Recusa: <span class="required">*</span></label>
+          <label for="rejectionReasonInput" class="form-label">Motivo da rejeição (mín. {{ motivoMinimo }} caracteres): <span class="required">*</span></label>
           <textarea
             id="rejectionReasonInput"
             class="form-textarea"
@@ -838,11 +762,11 @@
         <button
           type="button"
           class="btn-sm-confirm-reject"
-          [disabled]="!rejectionReason().trim()"
+          [disabled]="!motivoValido(rejectionReason()) || isDeciding()"
           (click)="confirmRejection()"
         >
           <span class="material-symbols-rounded">cancel</span>
-          <span>Confirmar Recusa</span>
+          <span>Confirmar Rejeição</span>
         </button>
       </div>
     </div>
@@ -862,7 +786,7 @@
       <strong class="toast-title">{{ t.title }}</strong>
       <span class="toast-msg">{{ t.message }}</span>
     </div>
-    <button type="button" class="btn-toast-close" (click)="toast.set(null)">
+    <button type="button" class="btn-toast-close" (click)="toast.set(null)" aria-label="Fechar aviso">
       <span class="material-symbols-rounded">close</span>
     </button>
   </div>

@@ -490,22 +490,6 @@ $bg-page: #f8fafc;
   display: block;
 }
 
-.priority-pill {
-  display: inline-flex;
-  align-items: center;
-  font-size: 0.6rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  padding: 0.05rem 0.35rem;
-  border-radius: 3px;
-  margin-top: 0.15rem;
-
-  &.priority-critical { background: #fee2e2; color: #b91c1c; }
-  &.priority-high     { background: #ffedd5; color: #c2410c; }
-  &.priority-medium   { background: #fef9c3; color: #854d0e; }
-  &.priority-low      { background: #f1f5f9; color: #475569; }
-}
-
 .req-title-text {
   font-weight: 600;
   color: $text;
@@ -674,29 +658,6 @@ $bg-page: #f8fafc;
 
     &:hover {
       background: $primary;
-    }
-  }
-
-  .btn-act-validate {
-    background: #ffffff;
-    color: #0284c7;
-    border: 1px solid #bae6fd;
-    border-radius: 6px;
-    padding: 0.3rem 0.5rem;
-    font-size: 0.7rem;
-    font-weight: 600;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.2rem;
-    cursor: pointer;
-    transition: all 0.15s ease;
-
-    .material-symbols-rounded {
-      font-size: 15px;
-    }
-
-    &:hover {
-      background: #f0f9ff;
     }
   }
 
@@ -949,7 +910,6 @@ $bg-page: #f8fafc;
         color: #0f172a;
       }
 
-      .icon-validate { color: #0284c7; font-size: 20px; }
       .icon-adjust { color: #d97706; font-size: 20px; }
       .icon-reject { color: #e11d48; font-size: 20px; }
     }
@@ -1044,23 +1004,6 @@ $bg-page: #f8fafc;
         background: #f1f5f9;
         color: #0f172a;
       }
-    }
-
-    .btn-sm-confirm-validate {
-      background: #0284c7;
-      color: #ffffff;
-      border: none;
-      font-size: 0.8rem;
-      font-weight: 600;
-      padding: 0.5rem 1.15rem;
-      border-radius: 6px;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-
-      .material-symbols-rounded { font-size: 16px; }
-      &:hover { background: #0369a1; }
     }
 
     .btn-sm-confirm-adjust {
@@ -1202,56 +1145,6 @@ $bg-page: #f8fafc;
     line-height: 1.5;
 
     p { margin: 0; }
-  }
-}
-
-.attachments-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-
-  .attachment-item {
-    display: flex;
-    align-items: center;
-    gap: 0.65rem;
-    background: #ffffff;
-    border: 1px solid #eef2f6;
-    border-radius: 8px;
-    padding: 0.6rem 0.85rem;
-
-    .att-icon {
-      font-size: 20px;
-      color: #e11d48;
-    }
-
-    .att-info {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-
-      .att-name {
-        font-size: 0.75rem;
-        font-weight: 600;
-        color: #0f172a;
-      }
-
-      .att-size {
-        font-size: 0.65rem;
-        color: #94a3b8;
-      }
-    }
-
-    .btn-att-download {
-      background: transparent;
-      border: none;
-      color: #64748b;
-      cursor: pointer;
-      padding: 0.25rem;
-
-      &:hover {
-        color: #0f172a;
-      }
-    }
   }
 }
 
@@ -1451,20 +1344,6 @@ $bg-page: #f8fafc;
           }
         }
 
-        .signature-canvas-preview {
-          background: #ffffff;
-          border-radius: 6px;
-          padding: 0.2rem 0.4rem;
-          display: inline-block;
-          max-width: 200px;
-
-          .signature-preview-img {
-            max-height: 44px;
-            width: auto;
-            display: block;
-          }
-        }
-
         .stamp-footer {
           display: flex;
           flex-direction: column;
@@ -1626,4 +1505,18 @@ $bg-page: #f8fafc;
 @keyframes slideInUp {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+.spin-icon {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }

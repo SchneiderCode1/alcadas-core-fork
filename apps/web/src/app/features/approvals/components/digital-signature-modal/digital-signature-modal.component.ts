@@ -8,6 +8,7 @@ import {
   signal,
   AfterViewInit,
   effect,
+  untracked,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -30,6 +31,8 @@ export class DigitalSignatureModalComponent implements AfterViewInit {
 
   readonly isOpen = input<boolean>(false);
   readonly request = input<RequestItem | null>(null);
+  /** Nome do aprovador logado, usado como rubrica digitada inicial. */
+  readonly signatario = input<string>('');
 
   readonly confirmed = output<SignatureConfirmation>();
   readonly closed = output<void>();
@@ -40,7 +43,7 @@ export class DigitalSignatureModalComponent implements AfterViewInit {
   readonly comentario = signal<string>('Aprovado nos termos da política de governança corporativa.');
   readonly hasDrawn = signal<boolean>(false);
   readonly signMode = signal<'draw' | 'type'>('draw');
-  readonly typedSignature = signal<string>('Matheus Szervinsk');
+  readonly typedSignature = signal<string>('');
 
   private isDrawing = false;
   private ctx: CanvasRenderingContext2D | null = null;
@@ -50,6 +53,7 @@ export class DigitalSignatureModalComponent implements AfterViewInit {
       if (this.isOpen()) {
         this.isAgreed.set(false);
         this.showAgreementWarning.set(false);
+        this.typedSignature.set(untracked(this.signatario));
         setTimeout(() => {
           this.initCanvas();
         }, 80);
@@ -91,13 +95,15 @@ export class DigitalSignatureModalComponent implements AfterViewInit {
     if (!this.canvasRef || !this.ctx) return;
     const canvas = this.canvasRef.nativeElement;
     this.clearCanvas();
+    const rubrica = this.typedSignature().trim();
+    if (!rubrica) return;
 
     this.ctx.save();
     this.ctx.font = 'italic 36px "Brush Script MT", "Caveat", "Dancing Script", "Segoe Script", cursive, sans-serif';
     this.ctx.fillStyle = '#0f172a';
     this.ctx.textAlign = 'center';
     this.ctx.textBaseline = 'middle';
-    this.ctx.fillText(this.typedSignature() || 'M. Szervinsk', canvas.width / 2, canvas.height / 2 - 4);
+    this.ctx.fillText(rubrica, canvas.width / 2, canvas.height / 2 - 4);
 
     // Linha elegante de rubrica embaixo
     this.ctx.lineWidth = 2;
